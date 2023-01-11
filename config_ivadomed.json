@@ -16,9 +16,9 @@
         "log_grads_every": 100
     },
     "loader_parameters": {
-        "path_data": ["/home/GRAMES.POLYMTL.CA/p101317/data_nvme_p101317/mouse_zurich/zurich-mouse"],
+        "path_data": ["/home/GRAMES.POLYMTL.CA/p101317/data_nvme_p101317/mouse-zurich/zurich-mouse"],
         "subject_selection": {"n": [], "metadata": [], "value": []},
-        "target_suffix": ["_WM_mask", "_GM_mask"],
+        "target_suffix": ["_label-WM_mask", "_label-GM_mask"],
         "extensions": [".nii.gz"],
         "roi_params": {
             "suffix": null,
