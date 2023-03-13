@@ -9,6 +9,6 @@ Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
 ## Installation
 
 ~~~
-pip install -q "monai-weekly[gdown, nibabel, tqdm, ignite]"
-pip install -q wandb
+pip install "monai-weekly[gdown, nibabel, tqdm, ignite]"
+pip install wandb
 ~~~
