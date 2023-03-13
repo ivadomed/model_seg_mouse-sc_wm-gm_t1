@@ -177,7 +177,7 @@ print(f"image shape: {image.shape}, label shape: {label.shape}")
 config = {
     # data
     "cache_rate": 1.0,
-    "num_workers": 2,
+    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
 
     # train settings
     "train_batch_size": 2,
