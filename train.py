@@ -12,7 +12,6 @@ import tempfile
 import wandb
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
-import matplotlib.pyplot as plt
 
 from monai.utils import first, set_determinism
 from monai.transforms import (
@@ -104,21 +103,16 @@ train_files, val_files = data_dicts[:-9], data_dicts[-9:]
 # Set deterministic training for reproducibility
 set_determinism(seed=0)
 
-
-"""# Setup transforms for training and validation
-
-Here we use several transforms to augment the dataset:
-1. `LoadImaged` loads the spleen CT images and labels from NIfTI format files.
-1. `EnsureChannelFirstd` ensures the original data to construct "channel first" shape.
-1. `Orientationd` unifies the data orientation based on the affine matrix.
-1. `Spacingd` adjusts the spacing by `pixdim=(1.5, 1.5, 2.)` based on the affine matrix.
-1. `ScaleIntensityRanged` extracts intensity range [-57, 164] and scales to [0, 1].
-1. `CropForegroundd` removes all zero borders to focus on the valid body area of the images and labels.
-1. `RandCropByPosNegLabeld` randomly crop patch samples from big image based on pos / neg ratio.  
-The image centers of negative samples must be in valid body area.
-1. `RandAffined` efficiently performs `rotate`, `scale`, `shear`, `translate`, etc. together based on PyTorch affine transform.
-"""
-
+# Setup transforms for training and validation
+# 1. `LoadImaged` loads the spleen CT images and labels from NIfTI format files.
+# 1. `EnsureChannelFirstd` ensures the original data to construct "channel first" shape.
+# 1. `Orientationd` unifies the data orientation based on the affine matrix.
+# 1. `Spacingd` adjusts the spacing by `pixdim=(1.5, 1.5, 2.)` based on the affine matrix.
+# 1. `ScaleIntensityRanged` extracts intensity range [-57, 164] and scales to [0, 1].
+# 1. `CropForegroundd` removes all zero borders to focus on the valid body area of the images and labels.
+# 1. `RandCropByPosNegLabeld` randomly crop patch samples from big image based on pos / neg ratio.
+# The image centers of negative samples must be in valid body area.
+# 1. `RandAffined` efficiently performs `rotate`, `scale`, `shear`, `translate`, etc. together based on PyTorch affine transform.
 train_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
@@ -165,74 +159,20 @@ val_transforms = Compose(
     ]
 )
 
-"""# Check DataLoader
-
-Now, we will plot a single slice from the first 3D image from the dataloader along with it's label to see if it is loaded and transformed correctly.
-"""
-
+# Check DataLoader
 check_ds = Dataset(data=val_files, transform=val_transforms)
 check_loader = DataLoader(check_ds, batch_size=1)
 check_data = first(check_loader)
 image, label = (check_data["image"][0][0], check_data["label"][0][0])
 print(f"image shape: {image.shape}, label shape: {label.shape}")
-# plot the slice [:, :, 80]
-plt.figure("check", (12, 6))
-plt.subplot(1, 2, 1)
-plt.title("image")
-plt.imshow(image[:, :, 80], cmap="gray")
-plt.subplot(1, 2, 2)
-plt.title("label")
-plt.imshow(label[:, :, 80])
-plt.show()
 
-"""Great, now we will create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore, we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices interactively in the W&B dashboard.
+# Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
+# we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
+# interactively in the W&B dashboard.
 
-# Logging spleen slices to W&B
-"""
-
-# utility function for generating interactive image mask from components
-def wb_mask(bg_img, mask):
-    return wandb.Image(bg_img, masks={
-    "ground truth" : {"mask_data" : mask, "class_labels" : {0: "background", 1: "mask"} }})
-
-#TODO: update total_slices
-def log_spleen_slices(total_slices=100):
-    
-    wandb_mask_logs = []
-    wandb_img_logs = []
-
-    check_ds = Dataset(data=train_files, transform=val_transforms)
-    check_loader = DataLoader(check_ds, batch_size=1)
-    check_data = first(check_loader) # get the first item of the dataloader
-
-    image, label = (check_data["image"][0][0], check_data["label"][0][0])
-    
-    for img_slice_no in range(total_slices):
-        img = image[:, :, img_slice_no]
-        lbl = label[:, :, img_slice_no]
-        
-        # append the image to wandb_img_list to visualize 
-        # the slices interactively in W&B dashboard
-        wandb_img_logs.append(wandb.Image(img, caption=f"Slice: {img_slice_no}"))
-
-        # append the image and masks to wandb_mask_logs
-        # to see the masks overlayed on the original image
-        wandb_mask_logs.append(wb_mask(img, lbl))
-
-    wandb.log({"Image": wandb_img_logs})
-    wandb.log({"Segmentation mask": wandb_mask_logs})
-
-# 🐝 init wandb with appropiate project and run name
-#wandb.init(project="MP2RAGE_MS_lesion_3D_Segmentation", name="slice_image_exploration")
-# 🐝 log images to W&B
-#log_spleen_slices(total_slices=100)
-# 🐝 finish the run
-#wandb.finish()
-
-"""# Define Configuration
-
-Here, we define the configuration for dataloaders, models, train settings in a dictionary. Note that this config object would be passed to `wandb.init()` method to log all the necessary parameters that went into the experiment.
-"""
+# Define Configuration
+# Here, we define the configuration for dataloaders, models, train settings in a dictionary. Note that this config
+# object would be passed to `wandb.init()` method to log all the necessary parameters that went into the experiment.
 
 config = {
     # data
@@ -250,24 +190,21 @@ config = {
     # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
     "model_type": "unet", # just to keep track
     "model_params": dict(spatial_dims=3,
-                  in_channels=1,
-                  out_channels=2,
-                  channels=(16, 32, 64, 128, 256),
-                  strides=(2, 2, 2, 2),
-                  num_res_units=2,
-                  norm=Norm.BATCH,
+                         in_channels=1,
+                         out_channels=2,
+                         channels=(16, 32, 64, 128, 256),
+                         strides=(2, 2, 2, 2),
+                         num_res_units=2,
+                         norm=Norm.BATCH,
     )
 }
 
-"""# Define CacheDataset and DataLoader for training and validation
-
-Here we use `CacheDataset` to accelerate training and validation process, it's 10x faster than the regular Dataset.  
-To achieve best performance, set `cache_rate=1.0` to cache all the data, if memory is not enough, set lower value.  
-Users can also set `cache_num` instead of `cache_rate`, will use the minimum value of the 2 settings.  
-And set `num_workers` to enable multi-threads during caching.  
-If want to to try the regular Dataset, just change to use the commented code below.
-"""
-
+# Define CacheDataset and DataLoader for training and validation
+# Here we use `CacheDataset` to accelerate training and validation process, it's 10x faster than the regular Dataset.
+# To achieve best performance, set `cache_rate=1.0` to cache all the data, if memory is not enough, set lower value.
+# Users can also set `cache_num` instead of `cache_rate`, will use the minimum value of the 2 settings.
+# And set `num_workers` to enable multi-threads during caching.
+# If want to try the regular Dataset, just change to use the commented code below.
 train_ds = CacheDataset(
     data=train_files, transform=train_transforms,
     cache_rate=config['cache_rate'], num_workers=config['num_workers'])
@@ -282,7 +219,7 @@ val_ds = CacheDataset(
 # val_ds = Dataset(data=val_files, transform=val_transforms)
 val_loader = DataLoader(val_ds, batch_size=config['val_batch_size'], num_workers=config['num_workers'])
 
-"""# Create Model, Loss, Optimizer and Scheduler"""
+# Create Model, Loss, Optimizer and Scheduler
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -295,14 +232,10 @@ scheduler = CosineAnnealingLR(optimizer, T_max=config['max_epochs'], eta_min=1e-
 # To avoid https://github.com/jcohenadad/model-seg-ms-mp2rage-monai/issues/1
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-
-"""# Execute a typical PyTorch training process"""
+# Execute a typical PyTorch training process
 
 # 🐝 initialize a wandb run
-wandb.init(
-    project="MP2RAGE_MS_lesion_3D_Segmentation",
-    config=config
-)
+wandb.init(project="mouse-zurich", config=config)
 
 # 🐝 log gradients of the model to wandb
 wandb.watch(model, log_freq=100)
