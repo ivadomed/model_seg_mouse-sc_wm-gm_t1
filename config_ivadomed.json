@@ -11,7 +11,7 @@
     "wandb": {
         "wandb_api_key": "9095e2bc9e4ab445d478c9c8a81759ae908be8c6",
         "project_name": "mouse-zurich",
-        "group_name": "2D",
+        "group_name": "2D-01",
         "run_name": "run-01",
         "log_grads_every": 100
     },
@@ -33,10 +33,10 @@
             "filter_empty_mask": true,
             "filter_empty_input": true
         },
-        "slice_axis": "axial",
+        "slice_axis": "coronal",
         "multichannel": false,
         "soft_gt": false,
-        "bids_validate": true
+        "bids_validate": false
     },
     "split_dataset": {
         "fname_split": null,
@@ -44,7 +44,7 @@
         "split_method" : "participant_id",
         "data_testing": {"data_type": null, "data_value":[]},
         "balance": null,
-        "train_fraction": 0.8,
+        "train_fraction": 0.7,
         "test_fraction": 0
     },
     "training_parameters": {
@@ -53,7 +53,7 @@
             "name": "DiceLoss"
         },
         "training_time": {
-            "num_epochs": 50,
+            "num_epochs": 200,
             "early_stopping_patience": 50,
             "early_stopping_epsilon": 0.001
         },
