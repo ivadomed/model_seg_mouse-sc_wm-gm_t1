@@ -5,3 +5,10 @@ Publication linked to the dataset: https://pubmed.ncbi.nlm.nih.gov/35585865/
 Dataset: TODO
 
 Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
+
+## Installation
+
+~~~
+pip install -q "monai-weekly[gdown, nibabel, tqdm, ignite]"
+pip install -q wandb
+~~~
