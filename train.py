@@ -12,6 +12,7 @@ import tempfile
 import wandb
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import matplotlib.pyplot as plt
 
 from monai.utils import first, set_determinism
 from monai.transforms import (
@@ -113,27 +114,37 @@ set_determinism(seed=0)
 # 1. `RandCropByPosNegLabeld` randomly crop patch samples from big image based on pos / neg ratio.
 # The image centers of negative samples must be in valid body area.
 # 1. `RandAffined` efficiently performs `rotate`, `scale`, `shear`, `translate`, etc. together based on PyTorch affine transform.
+
+# train_transforms = Compose (
+#     [
+#         LoadImaged(keys=keys),
+#         AddChanneld(keys=keys),
+#         NormalizeIntensityd(keys=image_keys, nonzero=True),
+#         #nonzero=True -> normalize only non-zero values
+#         RandCropByPosNegLabeld(keys=keys, label_key="label", image_key="image", spatial_size=(128,128,128), num_samples=32, pos=4, neg=1),
+#         RandSpatialCropd(keys=keys, roi_size=(96,96,96), random_center=True, random_size=False),
+#         RandSpatialCropSamplesd(keys=keys, roi_size=(96,96,1), num_samples=96, random_center=True, random_size=False),
+#         ToTensord(keys=keys) ] )
+
 train_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityRanged(
-            keys=["image"], a_min=0, a_max=4095,
+            keys=["image"], a_min=0, a_max=1,
             b_min=0.0, b_max=1.0, clip=True,
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
-        Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Spacingd(keys=["image", "label"], pixdim=(
-            1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+        Orientationd(keys=["image", "label"], axcodes="RSA"),
+        Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
         RandCropByPosNegLabeld(
             keys=["image", "label"],
-            label_key="label",
-            spatial_size=(96, 96, 96),
-            pos=1,
-            neg=1,
-            num_samples=4,
             image_key="image",
-            image_threshold=0,
+            label_key="label",
+            spatial_size=(96, 96, 1),
+            pos=4,
+            neg=0,
+            num_samples=32*96,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
         ),
         # user can also add other random transforms
         # RandAffined(
@@ -159,12 +170,22 @@ val_transforms = Compose(
     ]
 )
 
-# Check DataLoader
-check_ds = Dataset(data=val_files, transform=val_transforms)
+# Check Transforms
+check_ds = Dataset(data=train_files, transform=train_transforms)
 check_loader = DataLoader(check_ds, batch_size=1)
 check_data = first(check_loader)
 image, label = (check_data["image"][0][0], check_data["label"][0][0])
 print(f"image shape: {image.shape}, label shape: {label.shape}")
+# Check transforms in DataLoader
+
+plt.figure("check", (12, 6))
+plt.subplot(1, 2, 1)
+plt.title("image")
+plt.imshow(image[:, :], cmap="gray")
+plt.subplot(1, 2, 2)
+plt.title("label")
+plt.imshow(label[:, :])
+plt.show()
 
 # Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
 # we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
