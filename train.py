@@ -18,15 +18,20 @@ from monai.utils import first, set_determinism
 from monai.transforms import (
     AsDiscrete,
     AsDiscreted,
+    EnsureTyped,
     EnsureChannelFirstd,
     Compose,
     CropForegroundd,
     LoadImaged,
     Orientationd,
+    RandRotate90d,
     RandCropByPosNegLabeld,
+    Resized,
     SaveImaged,
+    ScaleIntensityd,
     ScaleIntensityRanged,
     Spacingd,
+    SqueezeDimd,
     Invertd,
 )
 from monai.handlers.utils import from_engine
@@ -35,7 +40,7 @@ from monai.networks.layers import Norm
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
-from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch
+from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, ShuffleBuffer, PatchIterd
 from monai.config import print_config
 from monai.apps import download_and_extract
 
@@ -126,51 +131,130 @@ set_determinism(seed=0)
 #         RandSpatialCropSamplesd(keys=keys, roi_size=(96,96,1), num_samples=96, random_center=True, random_size=False),
 #         ToTensord(keys=keys) ] )
 
+# Define Configuration
+# Here, we define the configuration for dataloaders, models, train settings in a dictionary. Note that this config
+# object would be passed to `wandb.init()` method to log all the necessary parameters that went into the experiment.
+config = {
+    # data
+    "cache_rate": 1.0,
+    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
+
+    # train settings
+    "train_batch_size": 2,
+    "val_batch_size": 1,
+    "learning_rate": 5e-3,
+    "max_epochs": 100,
+    "val_interval": 10,  # check validation score after n epochs
+    "lr_scheduler": "cosine_decay",  # just to keep track
+
+    # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
+    "model_type": "unet", # just to keep track
+    "model_params": dict(spatial_dims=2,
+                         in_channels=1,
+                         out_channels=1,
+                         channels=(16, 32, 64, 128),
+                         strides=(2, 2, 2),
+                         num_res_units=2,
+                         norm=Norm.BATCH,
+    )
+}
+
+# Volume-level transforms for both image and segmentation
 train_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
-        ScaleIntensityRanged(
-            keys=["image"], a_min=0, a_max=1,
-            b_min=0.0, b_max=1.0, clip=True,
-        ),
-        CropForegroundd(keys=["image", "label"], source_key="image"),
-        Orientationd(keys=["image", "label"], axcodes="RSA"),
-        Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
-        RandCropByPosNegLabeld(
-            keys=["image", "label"],
-            image_key="image",
-            label_key="label",
-            spatial_size=(96, 96, 1),
-            pos=4,
-            neg=0,
-            num_samples=32*96,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-        ),
-        # user can also add other random transforms
-        # RandAffined(
-        #     keys=['image', 'label'],
-        #     mode=('bilinear', 'nearest'),
-        #     prob=1.0, spatial_size=(96, 96, 96),
-        #     rotate_range=(0, 0, np.pi/15),
-        #     scale_range=(0.1, 0.1, 0.1)),
+        ScaleIntensityd(keys="image"),
+        RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 2]),
+        EnsureTyped(keys=["image", "label"]),
     ]
 )
-# TODO: apply same transfo here
-val_transforms = Compose(
-    [
-        LoadImaged(keys=["image", "label"]),
-        EnsureChannelFirstd(keys=["image", "label"]),
-        ScaleIntensityRanged(
-            keys=["image"], a_min=0, a_max=4095,
-            b_min=0.0, b_max=1.0, clip=True,
-        ),
-        CropForegroundd(keys=["image", "label"], source_key="image"),
-        Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Spacingd(keys=["image", "label"], pixdim=(
-            1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
-    ]
-)
+# 3D dataset with preprocessing transforms
+volume_ds = CacheDataset(data=train_files, transform=train_transforms)
+# use batch_size=1 to check the volumes because the input volumes have different shapes
+check_loader = DataLoader(volume_ds, batch_size=1)
+check_data = first(check_loader)
+print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
 
+# Volume to patch processing
+patch_func = PatchIterd(
+    keys=["image", "label"], patch_size=(None, 1, None), start_pos=(0, 0, 0)  # dynamic first two dimensions
+)
+patch_transform = Compose(
+    [
+        SqueezeDimd(keys=["image", "label"], dim=2),
+        Resized(keys=["image", "label"], spatial_size=[48, 48]),
+        # to use crop/pad instead of resize:
+        # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
+    ]
+)
+patch_ds = GridPatchDataset(
+    data=volume_ds, patch_iter=patch_func, transform=patch_transform, with_coordinates=False
+)
+shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
+train_loader = DataLoader(shuffle_ds,
+                          batch_size=config['train_batch_size'],
+                          num_workers=config['num_workers'],
+                          pin_memory=torch.cuda.is_available())
+check_data = first(train_loader)
+print("First patch's shape: ", check_data["image"].shape, check_data["label"].shape)
+# Plot slice
+image, label = (check_data["image"][0][0], check_data["label"][0][0])
+plt.figure("check", (12, 6))
+plt.subplot(1, 2, 1)
+plt.title("image")
+plt.imshow(image[:, :], cmap="gray")
+plt.subplot(1, 2, 2)
+plt.title("label")
+plt.imshow(label[:, :])
+plt.show()
+
+# OLD CODE <<
+# # Has to set Orientationd(axcodes=RSA) because of https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/2
+# train_transforms = Compose(
+#     [
+#         LoadImaged(keys=["image", "label"]),
+#         EnsureChannelFirstd(keys=["image", "label"]),
+#         ScaleIntensityRanged(
+#             keys=["image"], a_min=0, a_max=1,
+#             b_min=0.0, b_max=1.0, clip=True,
+#         ),
+#         CropForegroundd(keys=["image", "label"], source_key="image"),
+#         Orientationd(keys=["image", "label"], axcodes="RSA"),
+#         Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
+#         RandCropByPosNegLabeld(
+#             keys=["image", "label"],
+#             image_key="image",
+#             label_key="label",
+#             spatial_size=(96, 96, 1),
+#             pos=4,
+#             neg=0,
+#             num_samples=32*96,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+#         ),
+#         # user can also add other random transforms
+#         # RandAffined(
+#         #     keys=['image', 'label'],
+#         #     mode=('bilinear', 'nearest'),
+#         #     prob=1.0, spatial_size=(96, 96, 96),
+#         #     rotate_range=(0, 0, np.pi/15),
+#         #     scale_range=(0.1, 0.1, 0.1)),
+#     ]
+# )
+# # TODO: apply same transfo here
+# val_transforms = Compose(
+#     [
+#         LoadImaged(keys=["image", "label"]),
+#         EnsureChannelFirstd(keys=["image", "label"]),
+#         ScaleIntensityRanged(
+#             keys=["image"], a_min=0, a_max=4095,
+#             b_min=0.0, b_max=1.0, clip=True,
+#         ),
+#         CropForegroundd(keys=["image", "label"], source_key="image"),
+#         Orientationd(keys=["image", "label"], axcodes="RAS"),
+#         Spacingd(keys=["image", "label"], pixdim=(
+#             1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
+#     ]
+# )
 # # Check Transforms
 # check_ds = Dataset(data=train_files, transform=train_transforms)
 # check_loader = DataLoader(check_ds, batch_size=1)
@@ -186,74 +270,43 @@ val_transforms = Compose(
 # plt.title("label")
 # plt.imshow(label[:, :])
 # plt.show()
+# >>
 
-# Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
-# we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
-# interactively in the W&B dashboard.
-
-# Define Configuration
-# Here, we define the configuration for dataloaders, models, train settings in a dictionary. Note that this config
-# object would be passed to `wandb.init()` method to log all the necessary parameters that went into the experiment.
-
-config = {
-    # data
-    "cache_rate": 1.0,
-    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
-
-    # train settings
-    "train_batch_size": 2,
-    "val_batch_size": 1,
-    "learning_rate": 1e-3,
-    "max_epochs": 100,
-    "val_interval": 10, # check validation score after n epochs
-    "lr_scheduler": "cosine_decay", # just to keep track
-
-    # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
-    "model_type": "unet", # just to keep track
-    "model_params": dict(spatial_dims=3,
-                         in_channels=1,
-                         out_channels=2,
-                         channels=(16, 32, 64, 128, 256),
-                         strides=(2, 2, 2, 2),
-                         num_res_units=2,
-                         norm=Norm.BATCH,
-    )
-}
-
-# Define CacheDataset and DataLoader for training and validation
-# Here we use `CacheDataset` to accelerate training and validation process, it's 10x faster than the regular Dataset.
-# To achieve best performance, set `cache_rate=1.0` to cache all the data, if memory is not enough, set lower value.
-# Users can also set `cache_num` instead of `cache_rate`, will use the minimum value of the 2 settings.
-# And set `num_workers` to enable multi-threads during caching.
-# If want to try the regular Dataset, just change to use the commented code below.
-train_ds = CacheDataset(
-    data=train_files, transform=train_transforms,
-    cache_rate=config['cache_rate'], num_workers=config['num_workers'])
-# train_ds = Dataset(data=train_files, transform=train_transforms)
-
-# use batch_size=2 to load images and use RandCropByPosNegLabeld
-# to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=config['train_batch_size'], shuffle=True, num_workers=config['num_workers'])
-
-val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=config['cache_rate'], num_workers=config['num_workers'])
-# val_ds = Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=config['val_batch_size'], num_workers=config['num_workers'])
+# # Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
+# # we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
+# # interactively in the W&B dashboard.
+#
+# # Define CacheDataset and DataLoader for training and validation
+# # Here we use `CacheDataset` to accelerate training and validation process, it's 10x faster than the regular Dataset.
+# # To achieve best performance, set `cache_rate=1.0` to cache all the data, if memory is not enough, set lower value.
+# # Users can also set `cache_num` instead of `cache_rate`, will use the minimum value of the 2 settings.
+# # And set `num_workers` to enable multi-threads during caching.
+# # If want to try the regular Dataset, just change to use the commented code below.
+# train_ds = CacheDataset(
+#     data=train_files, transform=train_transforms,
+#     cache_rate=config['cache_rate'], num_workers=config['num_workers'])
+# # train_ds = Dataset(data=train_files, transform=train_transforms)
+#
+# # use batch_size=2 to load images and use RandCropByPosNegLabeld
+# # to generate 2 x 4 images for network training
+# train_loader = DataLoader(train_ds, batch_size=config['train_batch_size'], shuffle=True, num_workers=config['num_workers'])
+#
+# val_ds = CacheDataset(
+#     data=val_files, transform=val_transforms, cache_rate=config['cache_rate'], num_workers=config['num_workers'])
+# # val_ds = Dataset(data=val_files, transform=val_transforms)
+# val_loader = DataLoader(val_ds, batch_size=config['val_batch_size'], num_workers=config['num_workers'])
 
 # Create Model, Loss, Optimizer and Scheduler
-
-# standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = UNet(**config['model_params']).to(device)
-loss_function = DiceLoss(to_onehot_y=True, softmax=True)
+# TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
+loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 scheduler = CosineAnnealingLR(optimizer, T_max=config['max_epochs'], eta_min=1e-9)
 
 # To avoid https://github.com/jcohenadad/model-seg-ms-mp2rage-monai/issues/1
 torch.multiprocessing.set_sharing_strategy('file_system')
-
-# Execute a typical PyTorch training process
 
 # 🐝 initialize a wandb run
 wandb.init(project="mouse-zurich", config=config)
