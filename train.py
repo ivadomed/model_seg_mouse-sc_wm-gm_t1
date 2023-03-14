@@ -155,6 +155,7 @@ train_transforms = Compose(
         #     scale_range=(0.1, 0.1, 0.1)),
     ]
 )
+# TODO: apply same transfo here
 val_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
@@ -170,22 +171,21 @@ val_transforms = Compose(
     ]
 )
 
-# Check Transforms
-check_ds = Dataset(data=train_files, transform=train_transforms)
-check_loader = DataLoader(check_ds, batch_size=1)
-check_data = first(check_loader)
-image, label = (check_data["image"][0][0], check_data["label"][0][0])
-print(f"image shape: {image.shape}, label shape: {label.shape}")
-# Check transforms in DataLoader
-
-plt.figure("check", (12, 6))
-plt.subplot(1, 2, 1)
-plt.title("image")
-plt.imshow(image[:, :], cmap="gray")
-plt.subplot(1, 2, 2)
-plt.title("label")
-plt.imshow(label[:, :])
-plt.show()
+# # Check Transforms
+# check_ds = Dataset(data=train_files, transform=train_transforms)
+# check_loader = DataLoader(check_ds, batch_size=1)
+# check_data = first(check_loader)
+# image, label = (check_data["image"][0][0], check_data["label"][0][0])
+# print(f"image shape: {image.shape}, label shape: {label.shape}")
+# # Plot slice
+# plt.figure("check", (12, 6))
+# plt.subplot(1, 2, 1)
+# plt.title("image")
+# plt.imshow(image[:, :], cmap="gray")
+# plt.subplot(1, 2, 2)
+# plt.title("label")
+# plt.imshow(label[:, :])
+# plt.show()
 
 # Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
 # we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
