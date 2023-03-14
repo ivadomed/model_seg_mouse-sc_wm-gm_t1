@@ -165,7 +165,7 @@ train_transforms = Compose(
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityd(keys="image"),
-        RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 2]),
+        RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
         EnsureTyped(keys=["image", "label"]),
     ]
 )
@@ -178,14 +178,23 @@ print("First volume's shape: ", check_data["image"].shape, check_data["label"].s
 
 # Volume to patch processing
 patch_func = PatchIterd(
-    keys=["image", "label"], patch_size=(None, 1, None), start_pos=(0, 0, 0)  # dynamic first two dimensions
+    keys=["image", "label"], patch_size=(None, None, 1), start_pos=(0, 0, 0)  # dynamic first two dimensions
 )
 patch_transform = Compose(
     [
-        SqueezeDimd(keys=["image", "label"], dim=2),
-        Resized(keys=["image", "label"], spatial_size=[48, 48]),
+        SqueezeDimd(keys=["image", "label"], dim=-1),
+        # Resized(keys=["image", "label"], spatial_size=[48, 48]),
         # to use crop/pad instead of resize:
         # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
+        RandCropByPosNegLabeld(
+            keys=["image", "label"],
+            image_key="image",
+            label_key="label",
+            spatial_size=(96, 96),
+            pos=1,
+            neg=0,
+            num_samples=5,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+        ),
     ]
 )
 patch_ds = GridPatchDataset(
