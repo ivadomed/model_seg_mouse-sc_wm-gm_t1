@@ -74,12 +74,36 @@ def match_images_and_labels(images, labels):
     return images_match, labels_match
 
 
-"""# Setup data directory
+def patch_func(dataset):
+    """Dummy function to output a sequence of dataset of length 1"""
+    return [dataset]
 
-You can specify a directory with the `MONAI_DATA_DIRECTORY` environment variable.
-This allows you to save results and reuse downloads.
-If not specified a temporary directory will be used.
-"""
+
+# Training parameters
+config = {
+    # data
+    "cache_rate": 1.0,
+    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
+
+    # train settings
+    "train_batch_size": 1,  # Change back to 2
+    "val_batch_size": 1,
+    "learning_rate": 5e-3,
+    "max_epochs": 100,
+    "val_interval": 10,  # check validation score after n epochs
+    "lr_scheduler": "cosine_decay",  # just to keep track
+
+    # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
+    "model_type": "unet",  # just to keep track
+    "model_params": dict(spatial_dims=2,
+                         in_channels=1,
+                         out_channels=1,
+                         channels=(16, 32, 64, 128),
+                         strides=(2, 2, 2),
+                         num_res_units=2,
+                         norm=Norm.BATCH,
+    )
+}
 
 # Setup data directory
 # TODO: parametrize input data dir
@@ -117,11 +141,6 @@ for data_dict in data_dicts:
             patch_data.append({'image': image_z, 'label': label_z})
 
 
-def patch_func(dataset):
-    """Dummy function to output a sequence of dataset of length 1"""
-    return [dataset]
-
-
 transforms = Compose(
     [
         ToTensor(),
@@ -132,363 +151,6 @@ train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per
 train_loader = DataLoader(train_ds, batch_size=1)
 val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
 val_loader = DataLoader(val_ds, batch_size=1)
-
-
-# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
-# i=0
-# for check_data in check_loader:
-#     if 'image' in check_data:
-#         print(f"{i}: {check_data['image'].size()}")
-#         i += 1
-
-
-# TODO: split across slices, not subjects
-# Split train/val
-# TODO: add randomization in the split
-# train_files, val_files = data_dicts[:-1], data_dicts[-1:]
-
-# Set deterministic training for reproducibility
-# set_determinism(seed=0)
-
-# Setup transforms for training and validation
-# 1. `LoadImaged` loads the spleen CT images and labels from NIfTI format files.
-# 1. `EnsureChannelFirstd` ensures the original data to construct "channel first" shape.
-# 1. `Orientationd` unifies the data orientation based on the affine matrix.
-# 1. `Spacingd` adjusts the spacing by `pixdim=(1.5, 1.5, 2.)` based on the affine matrix.
-# 1. `ScaleIntensityRanged` extracts intensity range [-57, 164] and scales to [0, 1].
-# 1. `CropForegroundd` removes all zero borders to focus on the valid body area of the images and labels.
-# 1. `RandCropByPosNegLabeld` randomly crop patch samples from big image based on pos / neg ratio.
-# The image centers of negative samples must be in valid body area.
-# 1. `RandAffined` efficiently performs `rotate`, `scale`, `shear`, `translate`, etc. together based on PyTorch affine transform.
-
-# train_transforms = Compose (
-#     [
-#         LoadImaged(keys=keys),
-#         AddChanneld(keys=keys),
-#         NormalizeIntensityd(keys=image_keys, nonzero=True),
-#         #nonzero=True -> normalize only non-zero values
-#         RandCropByPosNegLabeld(keys=keys, label_key="label", image_key="image", spatial_size=(128,128,128), num_samples=32, pos=4, neg=1),
-#         RandSpatialCropd(keys=keys, roi_size=(96,96,96), random_center=True, random_size=False),
-#         RandSpatialCropSamplesd(keys=keys, roi_size=(96,96,1), num_samples=96, random_center=True, random_size=False),
-#         ToTensord(keys=keys) ] )
-
-# Define Configuration
-# Here, we define the configuration for dataloaders, models, train settings in a dictionary. Note that this config
-# object would be passed to `wandb.init()` method to log all the necessary parameters that went into the experiment.
-config = {
-    # data
-    "cache_rate": 1.0,
-    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
-
-    # train settings
-    "train_batch_size": 1,  # Change back to 2
-    "val_batch_size": 1,
-    "learning_rate": 5e-3,
-    "max_epochs": 100,
-    "val_interval": 10,  # check validation score after n epochs
-    "lr_scheduler": "cosine_decay",  # just to keep track
-
-    # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
-    "model_type": "unet",  # just to keep track
-    "model_params": dict(spatial_dims=2,
-                         in_channels=1,
-                         out_channels=1,
-                         channels=(16, 32, 64, 128),
-                         strides=(2, 2, 2),
-                         num_res_units=2,
-                         norm=Norm.BATCH,
-    )
-}
-
-
-# # Define custom PatchDataset that only returns non-empty label slices
-# class MyPatchDataset(PatchDataset):
-#     def __init__(self, data, patch_size, num_patches, label_key):
-#         super().__init__(data, patch_size, num_patches)
-#         self.label_key = label_key
-#
-#     def __getitem__(self, index):
-#         image, label = super().__getitem__(index)
-#         if torch.sum(label[self.label_key]) == 0:
-#             raise ValueError(f"No label in patch {index}")
-#         return image, label
-
-
-# # Volume-level transforms for both image and segmentation
-# train_transforms = Compose(
-#     [
-#         LoadImaged(keys=["image", "label"]),
-#         EnsureChannelFirstd(keys=["image", "label"]),
-#         ScaleIntensityd(keys="image"),
-#         # RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
-#         EnsureTyped(keys=["image", "label"]),
-#     ]
-# )
-#
-# # 3D dataset with preprocessing transforms
-# volume_ds = CacheDataset(data=train_files, transform=train_transforms)
-#
-#
-# # # Approach KumoLiu
-# # # image patch sampler
-# # n_samples = 5
-# def volume_to_patch_remove_empty_labels(dataset):
-#     """Assumes slice to extract patch from is on the last dimension of the 3D image.
-#     """
-#     # TODO: Question: this function should output a sequence of len=samples_per_image, but how can I retrieve
-#     #   samples_per_image from inside this function? For now I've hard-coded samples_per_image=1.
-#     # TODO: accommodate batch>1
-#     patch_data = []
-#     # i=1
-#     # TODO: Question: Is there a slice iterator in MONAI to do this more elegantly?
-#     for i_z in range(dataset['label'].size()[-1]):
-#         # TODO: Check if OK to do the operation on the Tensor or if more efficient to convert to numpy array
-#         image_z = dataset['image'][:, :, :, i_z]
-#         label_z = dataset['label'][:, :, :, i_z]
-#         if label_z.sum() > 0:
-#             patch_data.append({'image': image_z, 'label': label_z})
-#             # if i == 10:
-#             #     break
-#             # i += 1
-#         else:
-#             patch_data.append({})
-#     return patch_data
-
-
-# sampler = RandCropByPosNegLabeld(
-#             keys=["image", "label"],
-#             label_key="label",
-#             spatial_size=(200, 200),
-#             pos=1,
-#             neg=0,
-#             num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-#         ),
-#
-# # patch-level intensity shifts
-# # patch_intensity = RandShiftIntensity(offsets=1.0, prob=1.0)
-# # construct the patch dataset
-# ds = Dataset(train_files, transform=train_transforms)
-# ds = PatchDataset(data=volume_ds,
-#                   patch_func=volume_to_patch_remove_empty_labels,
-#                   samples_per_image=500,
-#                   transform=None)
-# check_loader = DataLoader(ds, batch_size=1)
-# check_data = first(check_loader)
-#
-# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
-# i=0
-# for check_data in check_loader:
-#     if 'image' in check_data:
-#         print(f"{i}: {check_data['image'].size()}")
-#         i += 1
-    # # Plot slice
-    # image, label = (check_data["image"][0][0], check_data["label"][0][0])
-    # plt.figure("check", (12, 6))
-    # plt.subplot(1, 2, 1)
-    # plt.title("image")
-    # plt.imshow(image[:, :], cmap="gray")
-    # plt.subplot(1, 2, 2)
-    # plt.title("label")
-    # plt.imshow(label[:, :])
-    # plt.show()
-
-
-# ChatGPT 20230315_110053
-
-# # Define transforms to be applied to each 3D volume
-# transforms = Compose([
-#     LoadImaged(keys=["image", "label"]),
-# ])
-#
-# # Define a grid patch dataset to hold the extracted patches
-# patch_size = (256, 256, 1)
-# stride_size = (256, 256, 1)
-# grid_sampler = GridPatchDataset(
-#     data=[{'image': image_file, 'label': label_file} for image_file, label_file in zip(image_files, label_files)],
-#     patch_size=patch_size,
-#     stride_size=stride_size,
-#     num_workers=4,
-#     transform=transforms,
-# )
-#
-# # Define a data loader to iterate over the patches
-# data_loader = DataLoader(grid_sampler, batch_size=1)
-# TODO: could be useful
-# # Iterate over the patches and select only the 2D patches with non-empty labels
-# patch_data = []
-# for batch_data in data_loader:
-#     image, label = batch_data['image'][0], batch_data['label'][0]
-#     patch_label = label.sum(axis=0)
-#     if patch_label.sum() > 0:
-#         patch_data.append({'image': image, 'label': patch_label})
-#
-# # Define a dataset to hold the selected patches
-# patch_dataset = Dataset(patch_data)
-
-#
-#
-# # Approach ChatGPT
-# patch_size = [64, 64, 1]
-# num_patches = 10
-# label_key = "label"
-# # ds = Dataset(train_files, transform=train_transforms)
-# dataset = MyPatchDataset(volume_ds, patch_size, num_patches, label_key=label_key)
-# check_loader_custom = DataLoader(dataset, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available())
-#
-# for batch in check_loader_custom:
-#     print(batch["image"].size())
-#
-
-# # use batch_size=1 to check the volumes because the input volumes have different shapes
-# check_loader = DataLoader(volume_ds, batch_size=1)
-# check_data = first(check_loader)
-# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
-#
-# # Volume to patch processing
-# patch_func = PatchIterd(
-#     keys=["image", "label"], patch_size=(None, None, 1), start_pos=(0, 0, 0)  # dynamic first two dimensions
-# )
-# patch_transform = Compose(
-#     [
-#         SqueezeDimd(keys=["image", "label"], dim=-1),
-#         # Resized(keys=["image", "label"], spatial_size=[48, 48]),
-#         # to use crop/pad instead of resize:
-#         # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
-#         # CropForegroundd(keys=["image", "label"], source_key="label"),
-#         # RandCropByPosNegLabeld(
-#         #     keys=["image", "label"],
-#         #     label_key="label",
-#         #     spatial_size=(200, 200),
-#         #     pos=1,
-#         #     neg=0,
-#         #     num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-#         # ),
-#     ]
-# )
-# patch_ds = GridPatchDataset(
-#     data=volume_ds, patch_iter=patch_func, transform=patch_transform, with_coordinates=False
-# )
-# # patch_ds = PatchDataset(data=volume_ds, patch_func=patch_func, samples_per_image=1, transform=patch_transform)
-#
-# # shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
-# train_loader = DataLoader(patch_ds,
-#                           batch_size=config['train_batch_size'],
-#                           num_workers=config['num_workers'],
-#                           pin_memory=torch.cuda.is_available())
-# # for batch in train_loader:
-# #     print(batch["image"][0][0][0][0])
-# check_data = first(train_loader)
-# print("First patch's shape: ", check_data["image"].shape, check_data["label"].shape)
-# # Plot slice
-# image, label = (check_data["image"][0][0], check_data["label"][0][0])
-# plt.figure("check", (12, 6))
-# plt.subplot(1, 2, 1)
-# plt.title("image")
-# plt.imshow(image[:, :], cmap="gray")
-# plt.subplot(1, 2, 2)
-# plt.title("label")
-# plt.imshow(label[:, :])
-# plt.show()
-
-#
-# # OLD CODE <<
-# # Has to set Orientationd(axcodes=RSA) because of https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/2
-# train_transforms = Compose(
-#     [
-#         LoadImaged(keys=["image", "label"]),
-#         EnsureChannelFirstd(keys=["image", "label"]),
-#         ScaleIntensityRanged(
-#             keys=["image"], a_min=0, a_max=1,
-#             b_min=0.0, b_max=1.0, clip=True,
-#         ),
-#         # CropForegroundd(keys=["image", "label"], source_key="image"),
-#         # Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
-#         RandCropByPosNegLabeld(
-#             keys=["image", "label"],
-#             image_key="image",
-#             label_key="label",
-#             spatial_size=(200, 200, 1),
-#             pos=1,
-#             neg=0,
-#             num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-#         ),
-#         # user can also add other random transforms
-#         # RandAffined(
-#         #     keys=['image', 'label'],
-#         #     mode=('bilinear', 'nearest'),
-#         #     prob=1.0, spatial_size=(96, 96, 96),
-#         #     rotate_range=(0, 0, np.pi/15),
-#         #     scale_range=(0.1, 0.1, 0.1)),
-#     ]
-# )
-# # TODO: apply same transfo here
-# val_transforms = Compose(
-#     [
-#         LoadImaged(keys=["image", "label"]),
-#         EnsureChannelFirstd(keys=["image", "label"]),
-#         ScaleIntensityRanged(
-#             keys=["image"], a_min=0, a_max=4095,
-#             b_min=0.0, b_max=1.0, clip=True,
-#         ),
-#         CropForegroundd(keys=["image", "label"], source_key="image"),
-#         Spacingd(keys=["image", "label"], pixdim=(
-#             1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
-#     ]
-# )
-# # Check Transforms
-# check_ds = Dataset(data=train_files, transform=train_transforms)
-# check_loader = DataLoader(check_ds, batch_size=1)
-# # i=0
-# # for batch in check_loader:
-# #     print(i)
-# #     i=i+1
-# #     image, label = (batch["image"][0][0], batch["label"][0][0])
-# #     plt.figure("check", (12, 6))
-# #     plt.subplot(1, 2, 1)
-# #     plt.title("image")
-# #     plt.imshow(image[:, :], cmap="gray")
-# #     plt.subplot(1, 2, 2)
-# #     plt.title("label")
-# #     plt.imshow(label[:, :])
-# #     plt.show()
-#
-# check_data = first(check_loader)
-# image, label = (check_data["image"][0][0], check_data["label"][0][0])
-# print(f"image shape: {image.shape}, label shape: {label.shape}")
-# # Plot slice
-# plt.figure("check", (12, 6))
-# plt.subplot(1, 2, 1)
-# plt.title("image")
-# plt.imshow(image[:, :], cmap="gray")
-# plt.subplot(1, 2, 2)
-# plt.title("label")
-# plt.imshow(label[:, :])
-# plt.show()
-# a=1
-
-# # Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
-# # we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
-# # interactively in the W&B dashboard.
-#
-# # Define CacheDataset and DataLoader for training and validation
-# # Here we use `CacheDataset` to accelerate training and validation process, it's 10x faster than the regular Dataset.
-# # To achieve best performance, set `cache_rate=1.0` to cache all the data, if memory is not enough, set lower value.
-# # Users can also set `cache_num` instead of `cache_rate`, will use the minimum value of the 2 settings.
-# # And set `num_workers` to enable multi-threads during caching.
-# # If want to try the regular Dataset, just change to use the commented code below.
-# train_ds = CacheDataset(
-#     data=train_files, transform=train_transforms,
-#     cache_rate=config['cache_rate'], num_workers=config['num_workers'])
-# # train_ds = Dataset(data=train_files, transform=train_transforms)
-#
-# # use batch_size=2 to load images and use RandCropByPosNegLabeld
-# # to generate 2 x 4 images for network training
-# train_loader = DataLoader(train_ds, batch_size=config['train_batch_size'], shuffle=True, num_workers=config['num_workers'])
-#
-# val_ds = CacheDataset(
-#     data=val_files, transform=val_transforms, cache_rate=config['cache_rate'], num_workers=config['num_workers'])
-# # val_ds = Dataset(data=val_files, transform=val_transforms)
-# val_loader = DataLoader(val_ds, batch_size=config['val_batch_size'], num_workers=config['num_workers'])
 
 # Create Model, Loss, Optimizer and Scheduler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
