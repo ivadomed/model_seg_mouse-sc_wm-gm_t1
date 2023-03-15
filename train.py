@@ -34,6 +34,7 @@ from monai.transforms import (
     Spacingd,
     SqueezeDimd,
     Invertd,
+    ToTensor,
 )
 from monai.handlers.utils import from_engine
 from monai.networks.nets import UNet
@@ -121,9 +122,15 @@ def patch_func(dataset):
     return [dataset]
 
 
-train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=None)
+transforms = Compose(
+    [
+        ToTensor(),
+    ]
+)
+
+train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
-val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=None)
+val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
 val_loader = DataLoader(val_ds, batch_size=1)
 
 
