@@ -60,11 +60,11 @@ def match_images_and_labels(images, labels):
     labels_match = []
     # Loop across images
     for image in images:
-        # Fetch subject name
-        subject = image.split(os.path.sep)[-1].split("_")[0]
+        # Fetch file name without extension
+        filename = image.split(os.path.sep)[-1].split('.')[0]
         # Find equivalent in labels
         # TODO: check if label has 2 entries
-        label = [j for i, j in enumerate(labels) if subject in j]
+        label = [j for i, j in enumerate(labels) if filename in j]
         if label:
             images_match.append(image)
             labels_match.append(label[0])
@@ -104,7 +104,7 @@ data_dicts = [{"image": image_name, "label": label_name}
 # TODO: split across slices, not subjects
 # Split train/val
 # TODO: add randomization in the split
-train_files, val_files = data_dicts[:-6], data_dicts[-6:]
+train_files, val_files = data_dicts[:-1], data_dicts[-1:]
 
 # Set deterministic training for reproducibility
 set_determinism(seed=0)
@@ -246,8 +246,6 @@ for check_data in check_loader:
     plt.title("label")
     plt.imshow(label[:, :])
     plt.show()
-    # TODO: the first 5 images/labels are good (corresponds to the first volume), but the next ones are wrong: the 6th
-    #  image corresponds to the 1st image of volume 2, but the label corresponds to the 1st label of volume 1.
 
 # ChatGPT 20230315_110053
 
