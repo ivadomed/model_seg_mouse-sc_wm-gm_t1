@@ -121,13 +121,10 @@ def patch_func(dataset):
     return [dataset]
 
 
-ds = PatchDataset(data=patch_data,
-                  patch_func=patch_func,
-                  samples_per_image=1,
-                  transform=None)
-check_loader = DataLoader(ds, batch_size=1)
-check_data = first(check_loader)
-# TODO: split train/validation
+train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=None)
+train_loader = DataLoader(train_ds, batch_size=1)
+val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=None)
+val_loader = DataLoader(val_ds, batch_size=1)
 
 
 # print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
@@ -144,7 +141,7 @@ check_data = first(check_loader)
 # train_files, val_files = data_dicts[:-1], data_dicts[-1:]
 
 # Set deterministic training for reproducibility
-set_determinism(seed=0)
+# set_determinism(seed=0)
 
 # Setup transforms for training and validation
 # 1. `LoadImaged` loads the spleen CT images and labels from NIfTI format files.
@@ -210,45 +207,45 @@ config = {
 #         return image, label
 
 
-# Volume-level transforms for both image and segmentation
-train_transforms = Compose(
-    [
-        LoadImaged(keys=["image", "label"]),
-        EnsureChannelFirstd(keys=["image", "label"]),
-        ScaleIntensityd(keys="image"),
-        # RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
-        EnsureTyped(keys=["image", "label"]),
-    ]
-)
-
-# 3D dataset with preprocessing transforms
-volume_ds = CacheDataset(data=train_files, transform=train_transforms)
-
-
-# # Approach KumoLiu
-# # image patch sampler
-# n_samples = 5
-def volume_to_patch_remove_empty_labels(dataset):
-    """Assumes slice to extract patch from is on the last dimension of the 3D image.
-    """
-    # TODO: Question: this function should output a sequence of len=samples_per_image, but how can I retrieve
-    #   samples_per_image from inside this function? For now I've hard-coded samples_per_image=1.
-    # TODO: accommodate batch>1
-    patch_data = []
-    # i=1
-    # TODO: Question: Is there a slice iterator in MONAI to do this more elegantly?
-    for i_z in range(dataset['label'].size()[-1]):
-        # TODO: Check if OK to do the operation on the Tensor or if more efficient to convert to numpy array
-        image_z = dataset['image'][:, :, :, i_z]
-        label_z = dataset['label'][:, :, :, i_z]
-        if label_z.sum() > 0:
-            patch_data.append({'image': image_z, 'label': label_z})
-            # if i == 10:
-            #     break
-            # i += 1
-        else:
-            patch_data.append({})
-    return patch_data
+# # Volume-level transforms for both image and segmentation
+# train_transforms = Compose(
+#     [
+#         LoadImaged(keys=["image", "label"]),
+#         EnsureChannelFirstd(keys=["image", "label"]),
+#         ScaleIntensityd(keys="image"),
+#         # RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
+#         EnsureTyped(keys=["image", "label"]),
+#     ]
+# )
+#
+# # 3D dataset with preprocessing transforms
+# volume_ds = CacheDataset(data=train_files, transform=train_transforms)
+#
+#
+# # # Approach KumoLiu
+# # # image patch sampler
+# # n_samples = 5
+# def volume_to_patch_remove_empty_labels(dataset):
+#     """Assumes slice to extract patch from is on the last dimension of the 3D image.
+#     """
+#     # TODO: Question: this function should output a sequence of len=samples_per_image, but how can I retrieve
+#     #   samples_per_image from inside this function? For now I've hard-coded samples_per_image=1.
+#     # TODO: accommodate batch>1
+#     patch_data = []
+#     # i=1
+#     # TODO: Question: Is there a slice iterator in MONAI to do this more elegantly?
+#     for i_z in range(dataset['label'].size()[-1]):
+#         # TODO: Check if OK to do the operation on the Tensor or if more efficient to convert to numpy array
+#         image_z = dataset['image'][:, :, :, i_z]
+#         label_z = dataset['label'][:, :, :, i_z]
+#         if label_z.sum() > 0:
+#             patch_data.append({'image': image_z, 'label': label_z})
+#             # if i == 10:
+#             #     break
+#             # i += 1
+#         else:
+#             patch_data.append({})
+#     return patch_data
 
 
 # sampler = RandCropByPosNegLabeld(
@@ -264,19 +261,19 @@ def volume_to_patch_remove_empty_labels(dataset):
 # # patch_intensity = RandShiftIntensity(offsets=1.0, prob=1.0)
 # # construct the patch dataset
 # ds = Dataset(train_files, transform=train_transforms)
-ds = PatchDataset(data=volume_ds,
-                  patch_func=volume_to_patch_remove_empty_labels,
-                  samples_per_image=500,
-                  transform=None)
-check_loader = DataLoader(ds, batch_size=1)
-check_data = first(check_loader)
-
-print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
-i=0
-for check_data in check_loader:
-    if 'image' in check_data:
-        print(f"{i}: {check_data['image'].size()}")
-        i += 1
+# ds = PatchDataset(data=volume_ds,
+#                   patch_func=volume_to_patch_remove_empty_labels,
+#                   samples_per_image=500,
+#                   transform=None)
+# check_loader = DataLoader(ds, batch_size=1)
+# check_data = first(check_loader)
+#
+# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+# i=0
+# for check_data in check_loader:
+#     if 'image' in check_data:
+#         print(f"{i}: {check_data['image'].size()}")
+#         i += 1
     # # Plot slice
     # image, label = (check_data["image"][0][0], check_data["label"][0][0])
     # plt.figure("check", (12, 6))
@@ -335,64 +332,56 @@ for check_data in check_loader:
 #     print(batch["image"].size())
 #
 
-
-
-
-
-
-
-
-
-# use batch_size=1 to check the volumes because the input volumes have different shapes
-check_loader = DataLoader(volume_ds, batch_size=1)
-check_data = first(check_loader)
-print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
-
-# Volume to patch processing
-patch_func = PatchIterd(
-    keys=["image", "label"], patch_size=(None, None, 1), start_pos=(0, 0, 0)  # dynamic first two dimensions
-)
-patch_transform = Compose(
-    [
-        SqueezeDimd(keys=["image", "label"], dim=-1),
-        # Resized(keys=["image", "label"], spatial_size=[48, 48]),
-        # to use crop/pad instead of resize:
-        # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
-        # CropForegroundd(keys=["image", "label"], source_key="label"),
-        # RandCropByPosNegLabeld(
-        #     keys=["image", "label"],
-        #     label_key="label",
-        #     spatial_size=(200, 200),
-        #     pos=1,
-        #     neg=0,
-        #     num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-        # ),
-    ]
-)
-patch_ds = GridPatchDataset(
-    data=volume_ds, patch_iter=patch_func, transform=patch_transform, with_coordinates=False
-)
-# patch_ds = PatchDataset(data=volume_ds, patch_func=patch_func, samples_per_image=1, transform=patch_transform)
-
-# shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
-train_loader = DataLoader(patch_ds,
-                          batch_size=config['train_batch_size'],
-                          num_workers=config['num_workers'],
-                          pin_memory=torch.cuda.is_available())
-# for batch in train_loader:
-#     print(batch["image"][0][0][0][0])
-check_data = first(train_loader)
-print("First patch's shape: ", check_data["image"].shape, check_data["label"].shape)
-# Plot slice
-image, label = (check_data["image"][0][0], check_data["label"][0][0])
-plt.figure("check", (12, 6))
-plt.subplot(1, 2, 1)
-plt.title("image")
-plt.imshow(image[:, :], cmap="gray")
-plt.subplot(1, 2, 2)
-plt.title("label")
-plt.imshow(label[:, :])
-plt.show()
+# # use batch_size=1 to check the volumes because the input volumes have different shapes
+# check_loader = DataLoader(volume_ds, batch_size=1)
+# check_data = first(check_loader)
+# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+#
+# # Volume to patch processing
+# patch_func = PatchIterd(
+#     keys=["image", "label"], patch_size=(None, None, 1), start_pos=(0, 0, 0)  # dynamic first two dimensions
+# )
+# patch_transform = Compose(
+#     [
+#         SqueezeDimd(keys=["image", "label"], dim=-1),
+#         # Resized(keys=["image", "label"], spatial_size=[48, 48]),
+#         # to use crop/pad instead of resize:
+#         # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
+#         # CropForegroundd(keys=["image", "label"], source_key="label"),
+#         # RandCropByPosNegLabeld(
+#         #     keys=["image", "label"],
+#         #     label_key="label",
+#         #     spatial_size=(200, 200),
+#         #     pos=1,
+#         #     neg=0,
+#         #     num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+#         # ),
+#     ]
+# )
+# patch_ds = GridPatchDataset(
+#     data=volume_ds, patch_iter=patch_func, transform=patch_transform, with_coordinates=False
+# )
+# # patch_ds = PatchDataset(data=volume_ds, patch_func=patch_func, samples_per_image=1, transform=patch_transform)
+#
+# # shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
+# train_loader = DataLoader(patch_ds,
+#                           batch_size=config['train_batch_size'],
+#                           num_workers=config['num_workers'],
+#                           pin_memory=torch.cuda.is_available())
+# # for batch in train_loader:
+# #     print(batch["image"][0][0][0][0])
+# check_data = first(train_loader)
+# print("First patch's shape: ", check_data["image"].shape, check_data["label"].shape)
+# # Plot slice
+# image, label = (check_data["image"][0][0], check_data["label"][0][0])
+# plt.figure("check", (12, 6))
+# plt.subplot(1, 2, 1)
+# plt.title("image")
+# plt.imshow(image[:, :], cmap="gray")
+# plt.subplot(1, 2, 2)
+# plt.title("label")
+# plt.imshow(label[:, :])
+# plt.show()
 
 #
 # # OLD CODE <<
