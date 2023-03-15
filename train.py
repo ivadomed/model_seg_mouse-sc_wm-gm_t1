@@ -40,7 +40,7 @@ from monai.networks.layers import Norm
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
-from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, ShuffleBuffer, PatchIterd
+from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, PatchDataset, ShuffleBuffer, PatchIterd
 from monai.config import print_config
 from monai.apps import download_and_extract
 
@@ -101,10 +101,10 @@ train_labels = \
 train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels)
 data_dicts = [{"image": image_name, "label": label_name}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
-
+# TODO: split across slices, not subjects
 # Split train/val
 # TODO: add randomization in the split
-train_files, val_files = data_dicts[:-9], data_dicts[-9:]
+train_files, val_files = data_dicts[:-6], data_dicts[-6:]
 
 # Set deterministic training for reproducibility
 set_determinism(seed=0)
@@ -140,7 +140,7 @@ config = {
     "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
 
     # train settings
-    "train_batch_size": 2,
+    "train_batch_size": 1,  # Change back to 2
     "val_batch_size": 1,
     "learning_rate": 5e-3,
     "max_epochs": 100,
@@ -148,7 +148,7 @@ config = {
     "lr_scheduler": "cosine_decay",  # just to keep track
 
     # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
-    "model_type": "unet", # just to keep track
+    "model_type": "unet",  # just to keep track
     "model_params": dict(spatial_dims=2,
                          in_channels=1,
                          out_channels=1,
@@ -159,18 +159,150 @@ config = {
     )
 }
 
+
+# # Define custom PatchDataset that only returns non-empty label slices
+# class MyPatchDataset(PatchDataset):
+#     def __init__(self, data, patch_size, num_patches, label_key):
+#         super().__init__(data, patch_size, num_patches)
+#         self.label_key = label_key
+#
+#     def __getitem__(self, index):
+#         image, label = super().__getitem__(index)
+#         if torch.sum(label[self.label_key]) == 0:
+#             raise ValueError(f"No label in patch {index}")
+#         return image, label
+
+
 # Volume-level transforms for both image and segmentation
 train_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityd(keys="image"),
-        RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
+        # RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
         EnsureTyped(keys=["image", "label"]),
     ]
 )
+
 # 3D dataset with preprocessing transforms
 volume_ds = CacheDataset(data=train_files, transform=train_transforms)
+
+
+# # Approach KumoLiu
+# # image patch sampler
+# n_samples = 5
+def volume_to_patch_remove_empty_labels(dataset):
+    """Assumes slice to extract patch from is on the last dimension of the 3D image.
+    """
+    # TODO: Question: this function should output a sequence of len=samples_per_image, but how can I retrieve
+    #   samples_per_image from inside this function? For now I've hard-coded samples_per_image=1.
+    # TODO: accommodate batch>1
+    patch_data = []
+    i=1
+    # TODO: Question: Is there a slice iterator in MONAI to do this more elegantly?
+    for i_z in range(dataset['label'].size()[-1]):
+        # TODO: Check if OK to do the operation on the Tensor or if more efficient to convert to numpy array
+        image_z = dataset['image'][:, :, :, i_z]
+        label_z = dataset['label'][:, :, :, i_z]
+        if label_z.sum() > 0:
+            patch_data.append({'image': image_z, 'label': label_z})
+            if i == 5:
+                break
+            i += 1
+
+    return patch_data
+
+
+# sampler = RandCropByPosNegLabeld(
+#             keys=["image", "label"],
+#             label_key="label",
+#             spatial_size=(200, 200),
+#             pos=1,
+#             neg=0,
+#             num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+#         ),
+#
+# # patch-level intensity shifts
+# # patch_intensity = RandShiftIntensity(offsets=1.0, prob=1.0)
+# # construct the patch dataset
+# ds = Dataset(train_files, transform=train_transforms)
+ds = PatchDataset(data=volume_ds,
+                  patch_func=volume_to_patch_remove_empty_labels,
+                  samples_per_image=5,
+                  transform=None)
+check_loader = DataLoader(ds, batch_size=1)
+check_data = first(check_loader)
+
+print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+for check_data in check_loader:
+    print(check_data["image"].size())
+    # Plot slice
+    image, label = (check_data["image"][0][0], check_data["label"][0][0])
+    plt.figure("check", (12, 6))
+    plt.subplot(1, 2, 1)
+    plt.title("image")
+    plt.imshow(image[:, :], cmap="gray")
+    plt.subplot(1, 2, 2)
+    plt.title("label")
+    plt.imshow(label[:, :])
+    plt.show()
+    # TODO: the first 5 images/labels are good (corresponds to the first volume), but the next ones are wrong: the 6th
+    #  image corresponds to the 1st image of volume 2, but the label corresponds to the 1st label of volume 1.
+
+# ChatGPT 20230315_110053
+
+# # Define transforms to be applied to each 3D volume
+# transforms = Compose([
+#     LoadImaged(keys=["image", "label"]),
+# ])
+#
+# # Define a grid patch dataset to hold the extracted patches
+# patch_size = (256, 256, 1)
+# stride_size = (256, 256, 1)
+# grid_sampler = GridPatchDataset(
+#     data=[{'image': image_file, 'label': label_file} for image_file, label_file in zip(image_files, label_files)],
+#     patch_size=patch_size,
+#     stride_size=stride_size,
+#     num_workers=4,
+#     transform=transforms,
+# )
+#
+# # Define a data loader to iterate over the patches
+# data_loader = DataLoader(grid_sampler, batch_size=1)
+# TODO: could be useful
+# # Iterate over the patches and select only the 2D patches with non-empty labels
+# patch_data = []
+# for batch_data in data_loader:
+#     image, label = batch_data['image'][0], batch_data['label'][0]
+#     patch_label = label.sum(axis=0)
+#     if patch_label.sum() > 0:
+#         patch_data.append({'image': image, 'label': patch_label})
+#
+# # Define a dataset to hold the selected patches
+# patch_dataset = Dataset(patch_data)
+
+#
+#
+# # Approach ChatGPT
+# patch_size = [64, 64, 1]
+# num_patches = 10
+# label_key = "label"
+# # ds = Dataset(train_files, transform=train_transforms)
+# dataset = MyPatchDataset(volume_ds, patch_size, num_patches, label_key=label_key)
+# check_loader_custom = DataLoader(dataset, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available())
+#
+# for batch in check_loader_custom:
+#     print(batch["image"].size())
+#
+
+
+
+
+
+
+
+
+
 # use batch_size=1 to check the volumes because the input volumes have different shapes
 check_loader = DataLoader(volume_ds, batch_size=1)
 check_data = first(check_loader)
@@ -186,25 +318,29 @@ patch_transform = Compose(
         # Resized(keys=["image", "label"], spatial_size=[48, 48]),
         # to use crop/pad instead of resize:
         # ResizeWithPadOrCropd(keys=["img", "seg"], spatial_size=[48, 48], mode="replicate"),
-        RandCropByPosNegLabeld(
-            keys=["image", "label"],
-            image_key="image",
-            label_key="label",
-            spatial_size=(96, 96),
-            pos=1,
-            neg=0,
-            num_samples=5,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
-        ),
+        # CropForegroundd(keys=["image", "label"], source_key="label"),
+        # RandCropByPosNegLabeld(
+        #     keys=["image", "label"],
+        #     label_key="label",
+        #     spatial_size=(200, 200),
+        #     pos=1,
+        #     neg=0,
+        #     num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+        # ),
     ]
 )
 patch_ds = GridPatchDataset(
     data=volume_ds, patch_iter=patch_func, transform=patch_transform, with_coordinates=False
 )
-shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
-train_loader = DataLoader(shuffle_ds,
+# patch_ds = PatchDataset(data=volume_ds, patch_func=patch_func, samples_per_image=1, transform=patch_transform)
+
+# shuffle_ds = ShuffleBuffer(patch_ds, buffer_size=30, seed=0)
+train_loader = DataLoader(patch_ds,
                           batch_size=config['train_batch_size'],
                           num_workers=config['num_workers'],
                           pin_memory=torch.cuda.is_available())
+# for batch in train_loader:
+#     print(batch["image"][0][0][0][0])
 check_data = first(train_loader)
 print("First patch's shape: ", check_data["image"].shape, check_data["label"].shape)
 # Plot slice
@@ -218,7 +354,8 @@ plt.title("label")
 plt.imshow(label[:, :])
 plt.show()
 
-# OLD CODE <<
+#
+# # OLD CODE <<
 # # Has to set Orientationd(axcodes=RSA) because of https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/2
 # train_transforms = Compose(
 #     [
@@ -228,17 +365,16 @@ plt.show()
 #             keys=["image"], a_min=0, a_max=1,
 #             b_min=0.0, b_max=1.0, clip=True,
 #         ),
-#         CropForegroundd(keys=["image", "label"], source_key="image"),
-#         Orientationd(keys=["image", "label"], axcodes="RSA"),
-#         Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
+#         # CropForegroundd(keys=["image", "label"], source_key="image"),
+#         # Spacingd(keys=["image", "label"], pixdim=(0.05, 0.05, 0.05), mode=("bilinear", "nearest")),
 #         RandCropByPosNegLabeld(
 #             keys=["image", "label"],
 #             image_key="image",
 #             label_key="label",
-#             spatial_size=(96, 96, 1),
-#             pos=4,
+#             spatial_size=(200, 200, 1),
+#             pos=1,
 #             neg=0,
-#             num_samples=32*96,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
+#             num_samples=1,  # https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-4900531
 #         ),
 #         # user can also add other random transforms
 #         # RandAffined(
@@ -259,7 +395,6 @@ plt.show()
 #             b_min=0.0, b_max=1.0, clip=True,
 #         ),
 #         CropForegroundd(keys=["image", "label"], source_key="image"),
-#         Orientationd(keys=["image", "label"], axcodes="RAS"),
 #         Spacingd(keys=["image", "label"], pixdim=(
 #             1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
 #     ]
@@ -267,6 +402,20 @@ plt.show()
 # # Check Transforms
 # check_ds = Dataset(data=train_files, transform=train_transforms)
 # check_loader = DataLoader(check_ds, batch_size=1)
+# # i=0
+# # for batch in check_loader:
+# #     print(i)
+# #     i=i+1
+# #     image, label = (batch["image"][0][0], batch["label"][0][0])
+# #     plt.figure("check", (12, 6))
+# #     plt.subplot(1, 2, 1)
+# #     plt.title("image")
+# #     plt.imshow(image[:, :], cmap="gray")
+# #     plt.subplot(1, 2, 2)
+# #     plt.title("label")
+# #     plt.imshow(label[:, :])
+# #     plt.show()
+#
 # check_data = first(check_loader)
 # image, label = (check_data["image"][0][0], check_data["label"][0][0])
 # print(f"image shape: {image.shape}, label shape: {label.shape}")
@@ -279,7 +428,7 @@ plt.show()
 # plt.title("label")
 # plt.imshow(label[:, :])
 # plt.show()
-# >>
+# a=1
 
 # # Create a function which will log all the slices of the 3D image to W&B to visualize them interactively. Furthermore,
 # # we will also log the slices with segmentation masks to see the overlayed view of segmentations masks on the slices
