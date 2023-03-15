@@ -25,6 +25,7 @@ from monai.transforms import (
     LoadImaged,
     Orientationd,
     RandRotate90d,
+    RandSpatialCropSamples,
     RandCropByPosNegLabeld,
     Resized,
     SaveImaged,
@@ -43,6 +44,7 @@ from monai.inferers import sliding_window_inference
 from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, PatchDataset, ShuffleBuffer, PatchIterd
 from monai.config import print_config
 from monai.apps import download_and_extract
+from nibabel import load
 
 # Let's print configuration of some packages by using a utility function provided by MONAI as `print_config()` which
 # basically lists down all the versions of the useful libraries.
@@ -91,7 +93,6 @@ print(f"Path to data: {data_dir}")
 # Setup output directory
 # TODO: parametrize
 root_dir = "./"
-
 # Set MSD dataset path
 # TODO: replace with https://github.com/ivadomed/templates/blob/main/dataset_conversion/create_msd_json_from_bids.py
 train_images = sorted(glob.glob(os.path.join(data_dir, "**", "*_T1w.nii.gz"), recursive=True))
@@ -101,10 +102,46 @@ train_labels = \
 train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels)
 data_dicts = [{"image": image_name, "label": label_name}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
+
+# Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
+patch_data = []
+for data_dict in data_dicts:
+    # i=1
+    nii_image = load(data_dict['image'])
+    nii_label = load(data_dict['label'])
+    for i_z in range(nii_label.shape[2]):
+        image_z = nii_image.get_fdata()[:, :, i_z]
+        label_z = nii_label.get_fdata()[:, :, i_z]
+        if label_z.sum() > 0:
+            patch_data.append({'image': image_z, 'label': label_z})
+
+
+def patch_func(dataset):
+    """Dummy function to output a sequence of dataset of length 1"""
+    return [dataset]
+
+
+ds = PatchDataset(data=patch_data,
+                  patch_func=patch_func,
+                  samples_per_image=1,
+                  transform=None)
+check_loader = DataLoader(ds, batch_size=1)
+check_data = first(check_loader)
+# TODO: split train/validation
+
+
+# print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+# i=0
+# for check_data in check_loader:
+#     if 'image' in check_data:
+#         print(f"{i}: {check_data['image'].size()}")
+#         i += 1
+
+
 # TODO: split across slices, not subjects
 # Split train/val
 # TODO: add randomization in the split
-train_files, val_files = data_dicts[:-1], data_dicts[-1:]
+# train_files, val_files = data_dicts[:-1], data_dicts[-1:]
 
 # Set deterministic training for reproducibility
 set_determinism(seed=0)
@@ -198,7 +235,7 @@ def volume_to_patch_remove_empty_labels(dataset):
     #   samples_per_image from inside this function? For now I've hard-coded samples_per_image=1.
     # TODO: accommodate batch>1
     patch_data = []
-    i=1
+    # i=1
     # TODO: Question: Is there a slice iterator in MONAI to do this more elegantly?
     for i_z in range(dataset['label'].size()[-1]):
         # TODO: Check if OK to do the operation on the Tensor or if more efficient to convert to numpy array
@@ -206,10 +243,11 @@ def volume_to_patch_remove_empty_labels(dataset):
         label_z = dataset['label'][:, :, :, i_z]
         if label_z.sum() > 0:
             patch_data.append({'image': image_z, 'label': label_z})
-            if i == 5:
-                break
-            i += 1
-
+            # if i == 10:
+            #     break
+            # i += 1
+        else:
+            patch_data.append({})
     return patch_data
 
 
@@ -228,24 +266,28 @@ def volume_to_patch_remove_empty_labels(dataset):
 # ds = Dataset(train_files, transform=train_transforms)
 ds = PatchDataset(data=volume_ds,
                   patch_func=volume_to_patch_remove_empty_labels,
-                  samples_per_image=5,
+                  samples_per_image=500,
                   transform=None)
 check_loader = DataLoader(ds, batch_size=1)
 check_data = first(check_loader)
 
 print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+i=0
 for check_data in check_loader:
-    print(check_data["image"].size())
-    # Plot slice
-    image, label = (check_data["image"][0][0], check_data["label"][0][0])
-    plt.figure("check", (12, 6))
-    plt.subplot(1, 2, 1)
-    plt.title("image")
-    plt.imshow(image[:, :], cmap="gray")
-    plt.subplot(1, 2, 2)
-    plt.title("label")
-    plt.imshow(label[:, :])
-    plt.show()
+    if 'image' in check_data:
+        print(f"{i}: {check_data['image'].size()}")
+        i += 1
+    # # Plot slice
+    # image, label = (check_data["image"][0][0], check_data["label"][0][0])
+    # plt.figure("check", (12, 6))
+    # plt.subplot(1, 2, 1)
+    # plt.title("image")
+    # plt.imshow(image[:, :], cmap="gray")
+    # plt.subplot(1, 2, 2)
+    # plt.title("label")
+    # plt.imshow(label[:, :])
+    # plt.show()
+
 
 # ChatGPT 20230315_110053
 
