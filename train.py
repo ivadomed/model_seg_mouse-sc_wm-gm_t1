@@ -329,8 +329,8 @@ with torch.no_grad():
         prediction = torch.argmax(
             val_outputs, dim=1).detach().cpu()[0, :, :]
 
-            # 🐝 Add data to wandb table dynamically    
-            table.add_data(fn, wandb.Image(img), wandb.Image(label), wandb.Image(prediction))
+        # 🐝 Add data to wandb table dynamically
+        table.add_data(fn, wandb.Image(img), wandb.Image(label), wandb.Image(prediction))
 
 # log predictions table to wandb with `val_predictions` as key
 wandb.log({"val_predictions": table})
