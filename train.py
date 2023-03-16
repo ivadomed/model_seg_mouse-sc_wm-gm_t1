@@ -129,6 +129,7 @@ train_labels = \
 train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels)
 data_dicts = [{"image": image_name, "label": label_name}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
+# TODO: add check if data empty
 
 # Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
 patch_data = []
