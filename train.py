@@ -85,10 +85,10 @@ def patch_func(dataset):
 config = {
     # data
     "cache_rate": 1.0,
-    "num_workers": 0,  # Set to 0 to debug under Pycharm (avoid multiproc). Otherwise, set to 2.
+    "num_workers": 0,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
     # train settings
-    "train_batch_size": 1,  # Change back to 2
+    "train_batch_size": 1,  # TODO: Change back to 2
     "val_batch_size": 1,
     "learning_rate": 5e-3,
     "max_epochs": 100,
@@ -228,7 +228,8 @@ for epoch in range(max_epochs):
                     val_data["image"].to(device),
                     val_data["label"].to(device),
                 )
-                roi_size = (160, 160, 160)
+                roi_size = (200, 200)
+                # roi_size = (160, 160, 160)
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model)
@@ -281,7 +282,7 @@ model.load_state_dict(torch.load(
 model.eval()
 with torch.no_grad():
     for i, val_data in enumerate(val_loader):
-        roi_size = (160, 160, 160)
+        roi_size = (200, 200)
         sw_batch_size = 4
         val_outputs = sliding_window_inference(
             val_data["image"].to(device), roi_size, sw_batch_size, model
@@ -290,14 +291,14 @@ with torch.no_grad():
         plt.figure("check", (18, 6))
         plt.subplot(1, 3, 1)
         plt.title(f"image {i}")
-        plt.imshow(val_data["image"][0, 0, :, :, 80], cmap="gray")
+        plt.imshow(val_data["image"][0, 0, :, :], cmap="gray")
         plt.subplot(1, 3, 2)
         plt.title(f"label {i}")
-        plt.imshow(val_data["label"][0, 0, :, :, 80])
+        plt.imshow(val_data["label"][0, 0, :, :])
         plt.subplot(1, 3, 3)
         plt.title(f"output {i}")
         plt.imshow(torch.argmax(
-            val_outputs, dim=1).detach().cpu()[0, :, :, 80])
+            val_outputs, dim=1).detach().cpu()[0, 0, :])
         plt.show()
         if i == 2:
             break
@@ -316,18 +317,17 @@ with torch.no_grad():
         # get the filename of the current image
         fn = val_data['image_meta_dict']['filename_or_obj'][0].split("/")[-1].split(".")[0]
 
-        roi_size = (160, 160, 160)
+        roi_size = (200, 200)
         sw_batch_size = 4
         val_outputs = sliding_window_inference(
             val_data["image"].to(device), roi_size, sw_batch_size, model
         )
 
-        # log last 20 slices of each 3D image
-        for slice_no in range(80, 100):
-            img = val_data["image"][0, 0, :, :, slice_no]
-            label = val_data["label"][0, 0, :, :, slice_no]
-            prediction = torch.argmax(
-                val_outputs, dim=1).detach().cpu()[0, :, :, slice_no]
+        # log each 2D image
+        img = val_data["image"][0, 0, :, :]
+        label = val_data["label"][0, 0, :, :]
+        prediction = torch.argmax(
+            val_outputs, dim=1).detach().cpu()[0, :, :]
 
             # 🐝 Add data to wandb table dynamically    
             table.add_data(fn, wandb.Image(img), wandb.Image(label), wandb.Image(prediction))
@@ -337,4 +337,3 @@ wandb.log({"val_predictions": table})
 
 # 🐝 Close your wandb run
 wandb.finish()
-
