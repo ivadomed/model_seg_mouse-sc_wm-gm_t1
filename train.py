@@ -6,6 +6,7 @@ Based on this tutorial: https://wandb.ai/gladiator/MONAI_Spleen_3D_Segmentation/
 
 import os
 import glob
+import numpy as np
 import shutil
 import tempfile
 
@@ -143,7 +144,7 @@ for data_dict in data_dicts:
 
 transforms = Compose(
     [
-        ToTensor(),
+        ToTensor(dtype=np.dtype('float32')),
     ]
 )
 
