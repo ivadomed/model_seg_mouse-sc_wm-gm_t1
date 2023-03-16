@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 from monai.utils import first, set_determinism
 from monai.transforms import (
+    AddChanneld,
     AsDiscrete,
     AsDiscreted,
     EnsureTyped,
@@ -144,6 +145,7 @@ for data_dict in data_dicts:
 
 transforms = Compose(
     [
+        AddChanneld(keys=["image", "label"]),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
