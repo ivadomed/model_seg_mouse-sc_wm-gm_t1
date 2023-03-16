@@ -81,6 +81,12 @@ def patch_func(dataset):
     return [dataset]
 
 
+# utility function for generating interactive image mask from components
+def wb_mask(bg_img, mask):
+    return wandb.Image(bg_img, masks={
+    "ground truth" : {"mask_data" : mask, "class_labels" : {0: "background", 1: "mask"} }})
+
+
 # Training parameters
 config = {
     # data
@@ -182,6 +188,8 @@ epoch_loss_values = []
 metric_values = []
 post_pred = Compose([AsDiscrete(argmax=True, to_onehot=2)])
 post_label = Compose([AsDiscrete(to_onehot=2)])
+wandb_mask_logs = []
+wandb_img_logs = []
 
 for epoch in range(max_epochs):
     print("-" * 10)
@@ -244,6 +252,20 @@ for epoch in range(max_epochs):
 
             # 🐝 log validation dice score for each validation round
             wandb.log({"val/dice_metric": metric})
+
+            # 🐝 show image with ground truth and prediction on eval dataset
+            val_check_ds = \
+                PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
+            val_check_loader = DataLoader(val_ds, batch_size=1)
+            # TODO: get a random image
+            check_data = first(val_check_loader)
+            image, label = (check_data['image'][0][0], check_data['label'][0][0])
+            # append the image to wandb_img_list to visualize the slices interactively in W&B dashboard
+            wandb_img_logs.append(wandb.Image(image, caption=f"Slice: TODO: enter sub number"))
+            # append the image and overlaid masks to wandb_mask_logs
+            wandb_mask_logs.append(wb_mask(image, label))
+            wandb.log({"Image": wandb_img_logs})
+            wandb.log({"Segmentation mask": wandb_mask_logs})
 
             # reset the status for next validation round
             dice_metric.reset()
