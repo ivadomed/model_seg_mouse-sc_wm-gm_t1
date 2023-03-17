@@ -22,6 +22,7 @@ from monai.transforms import (
     AsDiscreted,
     EnsureTyped,
     EnsureChannelFirstd,
+    EnsureChannelFirst,
     Compose,
     CropForegroundd,
     LoadImaged,
@@ -137,6 +138,59 @@ train_images_match, train_labels_match = match_images_and_labels(train_images, t
 data_dicts = [{"image": image_name, "label": label_name}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
 # TODO: add check if data empty
+
+# << Trying suggestion: https://github.com/Project-MONAI/MONAI/discussions/5948#discussioncomment-5330042
+# Split train/val
+train_files, val_files = data_dicts[:-1], data_dicts[-1:]
+# Set deterministic training for reproducibility
+set_determinism(seed=0)
+# # Volume-level transforms for both image and segmentation
+# train_transforms = Compose(
+#     [
+#         LoadImaged(keys=["image", "label"]),
+#         EnsureChannelFirstd(keys=["image", "label"]),
+#         ScaleIntensityd(keys="image"),
+#         # RandRotate90d(keys=["image", "label"], prob=0.5, spatial_axes=[0, 1]),
+#         EnsureTyped(keys=["image", "label"]),
+#     ]
+# )
+# # 3D dataset with preprocessing transforms
+# volume_ds = CacheDataset(data=train_files, transform=train_transforms)
+n_samples = 5
+sampler = Compose([
+    LoadImaged(keys=["image", "label"], image_only=True),
+    EnsureChannelFirstd(keys=["image", "label"]),
+    RandCropByPosNegLabeld(
+            keys=["image", "label"],
+            image_key="image",
+            label_key="label",
+            spatial_size=(200, 200, 1),
+            pos=1,
+            neg=0,
+            num_samples=n_samples,
+        ),
+])
+
+ds = PatchDataset(data=train_files,
+                  patch_func=sampler,
+                  samples_per_image=n_samples,
+                  transform=None)
+check_loader = DataLoader(ds, batch_size=1)
+check_data = first(check_loader)
+
+print("First volume's shape: ", check_data["image"].shape, check_data["label"].shape)
+i=0
+for check_data in check_loader:
+    if 'image' in check_data:
+        print(f"{i}: {check_data['image'].size()}")
+        i += 1
+
+# IGNORE CODE BELOW-- DEBUGGING
+
+
+
+
+
 
 # Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
 patch_data = []
