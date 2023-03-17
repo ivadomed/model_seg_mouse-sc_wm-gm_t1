@@ -266,11 +266,11 @@ for epoch in range(max_epochs):
             # log each 2D image
             img = val_data["image"][0, 0, :, :]
             label = val_data["label"][0, 0, :, :]
-            wandb.log({"Validation_Image/Prediction":
-                           wandb.Image(list_data_collate(val_outputs)[:, 1, :, :], caption=f"Slice: {slice_num}")})
+            wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
             wandb.log({"Validation_Image/Ground truth":
                            wandb.Image(list_data_collate(val_labels)[:, 1, :, :], caption=f"Slice: {slice_num}")})
-            wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
+            wandb.log({"Validation_Image/Prediction":
+                           wandb.Image(list_data_collate(val_outputs)[:, 1, :, :], caption=f"Slice: {slice_num}")})
 
             # reset the status for next validation round
             dice_metric.reset()
