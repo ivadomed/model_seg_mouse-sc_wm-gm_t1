@@ -20,41 +20,22 @@ from monai.transforms import (
     Activations,
     AddChanneld,
     AsDiscrete,
-    AsDiscreted,
-    EnsureTyped,
-    EnsureChannelFirstd,
     Compose,
-    CropForegroundd,
-    LoadImaged,
-    Orientationd,
     RandAffined,
     RandFlipd,
-    RandRotate90d,
     RandScaleIntensityd,
     RandShiftIntensityd,
-    RandSpatialCropSamples,
-    RandCropByPosNegLabeld,
-    Resized,
-    SaveImaged,
-    ScaleIntensity,
     ScaleIntensityd,
-    ScaleIntensityRanged,
-    Spacingd,
-    SqueezeDimd,
-    Invertd,
     ToTensor,
 )
 
-from monai.handlers.utils import from_engine
 from monai.networks.nets import UNet
 from monai.networks.layers import Norm
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
-from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, PatchDataset, ShuffleBuffer, PatchIterd
-from monai.data.utils import list_data_collate
+from monai.data import DataLoader, decollate_batch, PatchDataset
 from monai.config import print_config
-from monai.apps import download_and_extract
 from nibabel import load
 
 # Let's print configuration of some packages by using a utility function provided by MONAI as `print_config()` which
@@ -260,7 +241,6 @@ for epoch in range(max_epochs):
                 )
                 # TODO: parametrize this
                 roi_size = (200, 200)
-                # roi_size = (160, 160, 160)
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model)
