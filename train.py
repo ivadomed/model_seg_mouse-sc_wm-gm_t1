@@ -73,6 +73,10 @@ def patch_func(dataset):
     return [dataset]
 
 
+# Set default GPU number
+if 'CUDA_VISIBLE_DEVICES' not in os.environ:
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+
 # Training parameters
 config = {
     # data
@@ -172,7 +176,9 @@ val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_i
 val_loader = DataLoader(val_ds, batch_size=1)
 
 # Create Model, Loss, Optimizer and Scheduler
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+# TODO: use logging
+print(f"device: {device}")
 model = UNet(**config['model_params']).to(device)
 # TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
 loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
