@@ -1,7 +1,8 @@
 """
 Spinal cord white and gray matter segmentation (2 classes) using 2D kernel based on MONAI, with WandB monitoring.
 
-Based on this tutorial: https://wandb.ai/gladiator/MONAI_Spleen_3D_Segmentation/reports/3D-Segmentation-with-MONAI-and-PyTorch-Supercharged-by-Weights-Biases---VmlldzoyNDgxNDMz
+To launch:
+
 """
 
 import os
@@ -176,9 +177,12 @@ val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_i
 val_loader = DataLoader(val_ds, batch_size=1)
 
 # Create Model, Loss, Optimizer and Scheduler
-device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # TODO: use logging
-print(f"device: {device}")
+if device == "cuda":
+    print(f"device: {device}:{torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
+else:
+    print(f"device: {device}")
 model = UNet(**config['model_params']).to(device)
 # TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
 loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
