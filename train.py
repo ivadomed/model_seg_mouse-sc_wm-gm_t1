@@ -87,7 +87,7 @@ config = {
     # train settings
     "train_batch_size": 4,  # TODO: Change back to 2
     "val_batch_size": 1,
-    "learning_rate": 5e-3,
+    "learning_rate": 1e-3,
     "max_epochs": 200,
     "val_interval": 10,  # check validation score after n epochs
     "lr_scheduler": "cosine_decay",  # just to keep track
@@ -181,7 +181,7 @@ val_loader = DataLoader(val_ds, batch_size=1)
 # Create Model, Loss, Optimizer and Scheduler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # TODO: use logging
-if device == "cuda":
+if device.type == 'cuda':
     print(f"device: {device}:{torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
 else:
     print(f"device: {device}")
