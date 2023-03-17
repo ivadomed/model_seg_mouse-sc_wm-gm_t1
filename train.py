@@ -161,14 +161,16 @@ train_transforms = Compose(
     ]
 )
 
-val_transforms = train_transforms
-# val_transforms = Compose(
-#     [
-#         AddChanneld(keys=["image", "label"]),
-#         ScaleIntensityd(keys=["image"]),
-#         ToTensor(dtype=np.dtype('float32')),
-#     ]
-# )
+# val_transforms = train_transforms
+val_transforms = Compose(
+    [
+        AddChanneld(keys=["image", "label"]),
+        # ScaleIntensityd(keys=["image"]),
+        ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
+                                        relative=False),
+        ToTensor(dtype=np.dtype('float32')),
+    ]
+)
 
 # TODO: Randomize train/val
 train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
