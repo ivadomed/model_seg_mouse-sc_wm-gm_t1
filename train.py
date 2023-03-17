@@ -31,6 +31,7 @@ from monai.transforms import (
     RandCropByPosNegLabeld,
     Resized,
     SaveImaged,
+    ScaleIntensity,
     ScaleIntensityd,
     ScaleIntensityRanged,
     Spacingd,
@@ -154,6 +155,7 @@ for data_dict in data_dicts:
 transforms = Compose(
     [
         AddChanneld(keys=["image", "label"]),
+        ScaleIntensityd(keys=["image"]),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
