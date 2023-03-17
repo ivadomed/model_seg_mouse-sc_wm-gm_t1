@@ -161,6 +161,7 @@ transforms = Compose(
     ]
 )
 
+# TODO: Randomize train/val
 train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
 val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
@@ -303,60 +304,60 @@ wandb.log_artifact(model_artifact)
 model.load_state_dict(torch.load(
     os.path.join(root_dir, "best_metric_model.pth")))
 model.eval()
-with torch.no_grad():
-    for i, val_data in enumerate(val_loader):
-        roi_size = (200, 200)
-        sw_batch_size = 4
-        val_outputs = sliding_window_inference(
-            val_data["image"].to(device), roi_size, sw_batch_size, model
-        )
-        # plot the slice [:, :, 80]
-        plt.figure("check", (18, 6))
-        plt.subplot(1, 3, 1)
-        plt.title(f"image {i}")
-        plt.imshow(val_data["image"][0, 0, :, :], cmap="gray")
-        plt.subplot(1, 3, 2)
-        plt.title(f"label {i}")
-        plt.imshow(val_data["label"][0, 0, :, :])
-        plt.subplot(1, 3, 3)
-        plt.title(f"output {i}")
-        plt.imshow(torch.argmax(
-            val_outputs, dim=1).detach().cpu()[0, 0, :])
-        plt.show()
-        if i == 2:
-            break
+# with torch.no_grad():
+#     for i, val_data in enumerate(val_loader):
+#         roi_size = (200, 200)
+#         sw_batch_size = 4
+#         val_outputs = sliding_window_inference(
+#             val_data["image"].to(device), roi_size, sw_batch_size, model
+#         )
+#         # plot the slice [:, :, 80]
+#         plt.figure("check", (18, 6))
+#         plt.subplot(1, 3, 1)
+#         plt.title(f"image {i}")
+#         plt.imshow(val_data["image"][0, 0, :, :], cmap="gray")
+#         plt.subplot(1, 3, 2)
+#         plt.title(f"label {i}")
+#         plt.imshow(val_data["label"][0, 0, :, :])
+#         plt.subplot(1, 3, 3)
+#         plt.title(f"output {i}")
+#         plt.imshow(torch.argmax(
+#             val_outputs, dim=1).detach().cpu()[0, 0, :])
+#         plt.show()
+#         if i == 2:
+#             break
 
 """# Log predictions to W&B in form of table"""
 
-# 🐝 create a wandb table to log input image, ground_truth masks and predictions
-columns = ["filename", "image", "ground_truth", "prediction"]
-table = wandb.Table(columns=columns)
-
-model.load_state_dict(torch.load(
-    os.path.join(root_dir, "best_metric_model.pth")))
-model.eval()
-with torch.no_grad():
-    for i, val_data in enumerate(val_loader):
-        # get the filename of the current image
-        fn = val_data['image_meta_dict']['filename_or_obj'][0].split("/")[-1].split(".")[0]
-
-        roi_size = (200, 200)
-        sw_batch_size = 4
-        val_outputs = sliding_window_inference(
-            val_data["image"].to(device), roi_size, sw_batch_size, model
-        )
-
-        # log each 2D image
-        img = val_data["image"][0, 0, :, :]
-        label = val_data["label"][0, 0, :, :]
-        prediction = torch.argmax(
-            val_outputs, dim=1).detach().cpu()[0, :, :]
-
-        # 🐝 Add data to wandb table dynamically
-        table.add_data(fn, wandb.Image(img), wandb.Image(label), wandb.Image(prediction))
-
-# log predictions table to wandb with `val_predictions` as key
-wandb.log({"val_predictions": table})
+# # 🐝 create a wandb table to log input image, ground_truth masks and predictions
+# columns = ["filename", "image", "ground_truth", "prediction"]
+# table = wandb.Table(columns=columns)
+#
+# model.load_state_dict(torch.load(
+#     os.path.join(root_dir, "best_metric_model.pth")))
+# model.eval()
+# with torch.no_grad():
+#     for i, val_data in enumerate(val_loader):
+#         # get the filename of the current image
+#         fn = val_data['image_meta_dict']['filename_or_obj'][0].split("/")[-1].split(".")[0]
+#
+#         roi_size = (200, 200)
+#         sw_batch_size = 4
+#         val_outputs = sliding_window_inference(
+#             val_data["image"].to(device), roi_size, sw_batch_size, model
+#         )
+#
+#         # log each 2D image
+#         img = val_data["image"][0, 0, :, :]
+#         label = val_data["label"][0, 0, :, :]
+#         prediction = torch.argmax(
+#             val_outputs, dim=1).detach().cpu()[0, :, :]
+#
+#         # 🐝 Add data to wandb table dynamically
+#         table.add_data(fn, wandb.Image(img), wandb.Image(label), wandb.Image(prediction))
+#
+# # log predictions table to wandb with `val_predictions` as key
+# wandb.log({"val_predictions": table})
 
 # 🐝 Close your wandb run
 wandb.finish()
