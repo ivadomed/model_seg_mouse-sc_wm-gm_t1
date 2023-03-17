@@ -22,10 +22,13 @@ from monai.transforms import (
     AsDiscrete,
     Compose,
     RandAffined,
+    RandBiasFieldd,
     RandFlipd,
+    RandHistogramShiftd,
     RandScaleIntensityd,
     RandShiftIntensityd,
     ScaleIntensityd,
+    ScaleIntensityRangePercentilesd,
     ToTensor,
 )
 
@@ -132,18 +135,23 @@ for data_dict in data_dicts:
         if label_z.sum() > 0:
             patch_data.append({'image': image_z, 'label': label_z})
 
-
+# TODO: optimize hyperparam:
+#  RandAffined
 train_transforms = Compose(
     [
         AddChanneld(keys=["image", "label"]),
-        ScaleIntensityd(keys=["image"]),
+        # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+        # RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
+        # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
+        RandBiasFieldd(keys=["image"], degree=3, coeff_range=(0.0, 0.1)),
+        ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
+                                        relative=False),
+        # ScaleIntensityd(keys=["image"]),
         # RandSpatialCropd(keys=["image", "label"], roi_size=[224, 224, 144], random_size=False),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-        # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
-        # RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
-        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=0.8, spatial_size=(200, 200),
-                    rotate_range=(np.pi/15, np.pi/15), scale_range=(0.1, 0.1)),
+        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=1.0, spatial_size=(200, 200),
+                    translate_range=(0.2, 0.2), rotate_range=(np.pi/10, np.pi/10), scale_range=(0.15, 0.15)),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
