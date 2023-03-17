@@ -258,9 +258,12 @@ for epoch in range(max_epochs):
                 # 🐝 show image with ground truth and prediction on eval dataset
                 # TODO: display subject name and slice number
                 slice_num = 45
-                wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
-                wandb.log({"Validation_Image/Ground truth": wandb.Image(val_labels[0], caption=f"Slice: {slice_num}")})
-                wandb.log({"Validation_Image/Prediction": wandb.Image(val_outputs[0], caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Image":
+                               wandb.Image(val_inputs.cpu(), caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Ground truth":
+                               wandb.Image(val_labels[0].cpu(), caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Prediction":
+                               wandb.Image(val_outputs[0].cpu(), caption=f"Slice: {slice_num}")})
 
             # 🐝 aggregate the final mean dice result
             metric = dice_metric.aggregate().item()
