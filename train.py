@@ -85,10 +85,10 @@ config = {
     "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
     # train settings
-    "train_batch_size": 1,  # TODO: Change back to 2
+    "train_batch_size": 4,  # TODO: Change back to 2
     "val_batch_size": 1,
     "learning_rate": 5e-3,
-    "max_epochs": 500,
+    "max_epochs": 200,
     "val_interval": 10,  # check validation score after n epochs
     "lr_scheduler": "cosine_decay",  # just to keep track
 
