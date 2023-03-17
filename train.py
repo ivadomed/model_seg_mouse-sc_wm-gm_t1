@@ -45,6 +45,7 @@ from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
 from monai.data import CacheDataset, DataLoader, Dataset, decollate_batch, GridPatchDataset, PatchDataset, ShuffleBuffer, PatchIterd
+from monai.data.utils import list_data_collate
 from monai.config import print_config
 from monai.apps import download_and_extract
 from nibabel import load
@@ -81,10 +82,10 @@ def patch_func(dataset):
     return [dataset]
 
 
-# utility function for generating interactive image mask from components
-def wb_mask(bg_img, mask):
-    return wandb.Image(bg_img, masks={
-    "ground truth" : {"mask_data" : mask, "class_labels" : {0: "background", 1: "mask"} }})
+# # utility function for generating interactive image mask from components
+# def wb_mask(bg_img, mask):
+#     return wandb.Image(bg_img, masks={
+#     "ground truth" : {"mask_data" : mask, "class_labels" : {0: "background", 1: "mask"} }})
 
 
 # Training parameters
@@ -214,7 +215,7 @@ for epoch in range(max_epochs):
             f"train_loss: {loss.item():.4f}")
         
         # 🐝 log train_loss for each step to wandb
-        wandb.log({"train/loss": loss.item()})
+        wandb.log({"Training/loss": loss.item()})
     
     epoch_loss /= step
     epoch_loss_values.append(epoch_loss)
@@ -224,10 +225,10 @@ for epoch in range(max_epochs):
     scheduler.step()
     
     # 🐝 log train_loss averaged over epoch to wandb
-    wandb.log({"train/loss_epoch": epoch_loss})
+    wandb.log({"Training/loss_epoch": epoch_loss})
     
     # 🐝 log learning rate after each epoch to wandb
-    wandb.log({"learning_rate": scheduler.get_lr()[0]})
+    wandb.log({"Training/learning_rate": scheduler.get_lr()[0]})
 
     if (epoch + 1) % val_interval == 0:
         model.eval()
@@ -237,6 +238,7 @@ for epoch in range(max_epochs):
                     val_data["image"].to(device),
                     val_data["label"].to(device),
                 )
+                # TODO: parametrize this
                 roi_size = (200, 200)
                 # roi_size = (160, 160, 160)
                 sw_batch_size = 4
@@ -251,21 +253,22 @@ for epoch in range(max_epochs):
             metric = dice_metric.aggregate().item()
 
             # 🐝 log validation dice score for each validation round
-            wandb.log({"val/dice_metric": metric})
+            wandb.log({"Validation/dice_metric": metric})
 
             # 🐝 show image with ground truth and prediction on eval dataset
-            val_check_ds = \
-                PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
-            val_check_loader = DataLoader(val_ds, batch_size=1)
             # TODO: get a random image
-            check_data = first(val_check_loader)
-            image, label = (check_data['image'][0][0], check_data['label'][0][0])
-            # append the image to wandb_img_list to visualize the slices interactively in W&B dashboard
-            wandb_img_logs.append(wandb.Image(image, caption=f"Slice: TODO: enter sub number"))
-            # append the image and overlaid masks to wandb_mask_logs
-            wandb_mask_logs.append(wb_mask(image, label))
-            wandb.log({"Image": wandb_img_logs})
-            wandb.log({"Segmentation mask": wandb_mask_logs})
+            check_data = first(val_loader)
+            # TODO: display subject name and slice number
+            slice_num = 45
+            # image, label = (check_data['image'][0][0], check_data['label'][0][0])
+            # log each 2D image
+            img = val_data["image"][0, 0, :, :]
+            label = val_data["label"][0, 0, :, :]
+            wandb.log({"Validation_Image/Prediction":
+                           wandb.Image(list_data_collate(val_outputs)[:, 1, :, :], caption=f"Slice: {slice_num}")})
+            wandb.log({"Validation_Image/Ground truth":
+                           wandb.Image(list_data_collate(val_labels)[:, 1, :, :], caption=f"Slice: {slice_num}")})
+            wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
 
             # reset the status for next validation round
             dice_metric.reset()
