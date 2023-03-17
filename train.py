@@ -27,7 +27,11 @@ from monai.transforms import (
     CropForegroundd,
     LoadImaged,
     Orientationd,
+    RandAffined,
+    RandFlipd,
     RandRotate90d,
+    RandScaleIntensityd,
+    RandShiftIntensityd,
     RandSpatialCropSamples,
     RandCropByPosNegLabeld,
     Resized,
@@ -40,6 +44,7 @@ from monai.transforms import (
     Invertd,
     ToTensor,
 )
+
 from monai.handlers.utils import from_engine
 from monai.networks.nets import UNet
 from monai.networks.layers import Norm
@@ -82,12 +87,6 @@ def match_images_and_labels(images, labels):
 def patch_func(dataset):
     """Dummy function to output a sequence of dataset of length 1"""
     return [dataset]
-
-
-# # utility function for generating interactive image mask from components
-# def wb_mask(bg_img, mask):
-#     return wandb.Image(bg_img, masks={
-#     "ground truth" : {"mask_data" : mask, "class_labels" : {0: "background", 1: "mask"} }})
 
 
 # Training parameters
@@ -153,18 +152,34 @@ for data_dict in data_dicts:
             patch_data.append({'image': image_z, 'label': label_z})
 
 
-transforms = Compose(
+train_transforms = Compose(
     [
         AddChanneld(keys=["image", "label"]),
         ScaleIntensityd(keys=["image"]),
+        # RandSpatialCropd(keys=["image", "label"], roi_size=[224, 224, 144], random_size=False),
+        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
+        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
+        RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+        RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
+        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=0.8, spatial_size=(200, 200),
+                    rotate_range=(np.pi/15, np.pi/15), scale_range=(0.1, 0.1)),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
 
+val_transforms = train_transforms
+# val_transforms = Compose(
+#     [
+#         AddChanneld(keys=["image", "label"]),
+#         ScaleIntensityd(keys=["image"]),
+#         ToTensor(dtype=np.dtype('float32')),
+#     ]
+# )
+
 # TODO: Randomize train/val
-train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=transforms)
+train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
-val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=transforms)
+val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=val_transforms)
 val_loader = DataLoader(val_ds, batch_size=1)
 
 # Create Model, Loss, Optimizer and Scheduler
