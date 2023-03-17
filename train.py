@@ -158,7 +158,7 @@ set_determinism(seed=0)
 n_samples = 5
 sampler = Compose([
     LoadImaged(keys=["image", "label"], image_only=True),
-    EnsureChannelFirst(),
+    EnsureChannelFirstd(keys=["image", "label"]),
     RandCropByPosNegLabeld(
             keys=["image", "label"],
             image_key="image",
