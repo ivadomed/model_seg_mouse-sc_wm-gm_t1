@@ -101,6 +101,7 @@ config = {
                          strides=(2, 2, 2),
                          num_res_units=2,
                          norm=Norm.BATCH,
+                         dropout=0.3,
     )
 }
 
