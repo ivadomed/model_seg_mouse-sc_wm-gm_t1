@@ -74,13 +74,13 @@ def patch_func(dataset):
 config = {
     # data
     "cache_rate": 1.0,
-    "num_workers": 0,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
+    "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
     # train settings
     "train_batch_size": 1,  # TODO: Change back to 2
     "val_batch_size": 1,
     "learning_rate": 5e-3,
-    "max_epochs": 100,
+    "max_epochs": 500,
     "val_interval": 10,  # check validation score after n epochs
     "lr_scheduler": "cosine_decay",  # just to keep track
 
