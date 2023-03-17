@@ -246,6 +246,14 @@ for epoch in range(max_epochs):
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model)
+
+                # 🐝 show image with ground truth and prediction on eval dataset
+                # TODO: display subject name and slice number
+                slice_num = 45
+                wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Ground truth": wandb.Image(val_labels, caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Prediction": wandb.Image(val_outputs, caption=f"Slice: {slice_num}")})
+
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
@@ -256,21 +264,6 @@ for epoch in range(max_epochs):
 
             # 🐝 log validation dice score for each validation round
             wandb.log({"Validation/dice_metric": metric})
-
-            # 🐝 show image with ground truth and prediction on eval dataset
-            # TODO: get a random image
-            check_data = first(val_loader)
-            # TODO: display subject name and slice number
-            slice_num = 45
-            # image, label = (check_data['image'][0][0], check_data['label'][0][0])
-            # log each 2D image
-            img = val_data["image"][0, 0, :, :]
-            label = val_data["label"][0, 0, :, :]
-            wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
-            wandb.log({"Validation_Image/Ground truth":
-                           wandb.Image(list_data_collate(val_labels)[:, 1, :, :], caption=f"Slice: {slice_num}")})
-            wandb.log({"Validation_Image/Prediction":
-                           wandb.Image(list_data_collate(val_outputs)[:, 1, :, :], caption=f"Slice: {slice_num}")})
 
             # reset the status for next validation round
             dice_metric.reset()
@@ -365,3 +358,20 @@ wandb.log({"val_predictions": table})
 
 # 🐝 Close your wandb run
 wandb.finish()
+
+
+# DEBUGGING CODE
+# ==============
+# Plot slice
+image, label, prediction = (val_inputs[0][0], val_labels[0][0], val_outputs[0][0])
+plt.figure("check", (18, 6))
+plt.subplot(1, 3, 1)
+plt.title("image")
+plt.imshow(image[:, :], cmap="gray")
+plt.subplot(1, 3, 2)
+plt.title("label")
+plt.imshow(label[:, :])
+plt.subplot(1, 3, 3)
+plt.title("prediction")
+plt.imshow(prediction[:, :])
+plt.show()
