@@ -1,0 +1,12 @@
+# Pycharm stuff
+.idea/
+
+# Pytorch outputs
+best_metric_model.pth
+
+# Virtual env
+venv/
+
+# Wandb
+wandb/
+
