@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 from monai.utils import first, set_determinism
 from monai.transforms import (
+    Activations,
     AddChanneld,
     AsDiscrete,
     AsDiscreted,
@@ -189,8 +190,9 @@ best_metric = -1
 best_metric_epoch = -1
 epoch_loss_values = []
 metric_values = []
-post_pred = Compose([AsDiscrete(argmax=True, to_onehot=2)])
-post_label = Compose([AsDiscrete(to_onehot=2)])
+post_pred = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+# post_label = Compose([AsDiscrete(to_onehot=2)])
+post_label = Compose()
 wandb_mask_logs = []
 wandb_img_logs = []
 
@@ -247,17 +249,17 @@ for epoch in range(max_epochs):
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model)
 
-                # 🐝 show image with ground truth and prediction on eval dataset
-                # TODO: display subject name and slice number
-                slice_num = 45
-                wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
-                wandb.log({"Validation_Image/Ground truth": wandb.Image(val_labels, caption=f"Slice: {slice_num}")})
-                wandb.log({"Validation_Image/Prediction": wandb.Image(val_outputs, caption=f"Slice: {slice_num}")})
-
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
                 dice_metric(y_pred=val_outputs, y=val_labels)
+
+                # 🐝 show image with ground truth and prediction on eval dataset
+                # TODO: display subject name and slice number
+                slice_num = 45
+                wandb.log({"Validation_Image/Image": wandb.Image(val_inputs, caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Ground truth": wandb.Image(val_labels[0], caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Prediction": wandb.Image(val_outputs[0], caption=f"Slice: {slice_num}")})
 
             # 🐝 aggregate the final mean dice result
             metric = dice_metric.aggregate().item()
@@ -363,15 +365,15 @@ wandb.finish()
 # DEBUGGING CODE
 # ==============
 # Plot slice
-image, label, prediction = (val_inputs[0][0], val_labels[0][0], val_outputs[0][0])
-plt.figure("check", (18, 6))
-plt.subplot(1, 3, 1)
-plt.title("image")
-plt.imshow(image[:, :], cmap="gray")
-plt.subplot(1, 3, 2)
-plt.title("label")
-plt.imshow(label[:, :])
-plt.subplot(1, 3, 3)
-plt.title("prediction")
-plt.imshow(prediction[:, :])
-plt.show()
+# image, label, prediction = (val_inputs[0][0], val_labels[0][0], val_outputs[0][0])
+# plt.figure("check", (18, 6))
+# plt.subplot(1, 3, 1)
+# plt.title("image")
+# plt.imshow(image[:, :], cmap="gray")
+# plt.subplot(1, 3, 2)
+# plt.title("label")
+# plt.imshow(label[:, :])
+# plt.subplot(1, 3, 3)
+# plt.title("prediction")
+# plt.imshow(prediction[:, :])
+# plt.show()
