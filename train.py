@@ -99,8 +99,8 @@ config = {
     "model_params": dict(spatial_dims=2,
                          in_channels=1,
                          out_channels=1,
-                         channels=(8, 16, 32, 64, 128),
-                         strides=(2, 2, 2, 2),
+                         channels=(8, 16, 32, 64),
+                         strides=(2, 2, 2),
                          num_res_units=2,
                          norm=Norm.BATCH,
                          dropout=0.3,
@@ -151,11 +151,10 @@ train_transforms = Compose(
         # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
         # RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
         # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
-        RandBiasFieldd(keys=["image"], degree=3, coeff_range=(0.0, 0.1)),
+        # RandBiasFieldd(keys=["image"], degree=3, coeff_range=(0.0, 0.1)),
         ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
                                         relative=False),
         # ScaleIntensityd(keys=["image"]),
-        # RandSpatialCropd(keys=["image", "label"], roi_size=[224, 224, 144], random_size=False),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
         RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=1.0, spatial_size=(200, 200),
@@ -164,16 +163,16 @@ train_transforms = Compose(
     ]
 )
 
-# val_transforms = train_transforms
-val_transforms = Compose(
-    [
-        AddChanneld(keys=["image", "label"]),
+#val_transforms = Compose(
+#    [
+#        AddChanneld(keys=["image", "label"]),
         # ScaleIntensityd(keys=["image"]),
-        ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
-                                        relative=False),
-        ToTensor(dtype=np.dtype('float32')),
-    ]
-)
+#        ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
+#                                        relative=False),
+#        ToTensor(dtype=np.dtype('float32')),
+#    ]
+#)
+val_transforms = train_transforms
 
 # TODO: Randomize train/val
 train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
@@ -215,6 +214,10 @@ post_pred = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 post_label = Compose()
 wandb_mask_logs = []
 wandb_img_logs = []
+
+# 🐝 add this training script as an artifact
+artifact = wandb.Artifact(name='script', type='file')
+artifact.add_file(local_path=os.path.abspath(__file__), name='optional-name')
 
 for epoch in range(max_epochs):
     print("-" * 10)
