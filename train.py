@@ -217,7 +217,7 @@ wandb_img_logs = []
 
 # 🐝 add this training script as an artifact
 artifact_script = wandb.Artifact(name='script', type='file')
-artifact_script.add_file(local_path=os.path.abspath(__file__), name='optional-name')
+artifact_script.add_file(local_path=os.path.abspath(__file__), name=os.path.basename(__file__))
 wandb.log_artifact(artifact_script)
 
 for epoch in range(max_epochs):
