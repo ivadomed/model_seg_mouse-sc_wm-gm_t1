@@ -88,7 +88,7 @@ config = {
     "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
     # data augmentation (probability of occurrence)
-    "RandFlipd": 0.5,
+    "RandFlip": 0.5,
     "RandAffine": 0.5,
     "Rand2DElastic": 0.3,
 
@@ -111,7 +111,7 @@ config = {
                          # norm=Norm.BATCH,  # UNet
                          # dropout=0.3,  # UNet
                          img_size=(192, 192),  # UNETR
-                         feature_size=32,  # UNETR
+                         feature_size=16,  # UNETR
                          norm_name='batch',  # UNETR
                          dropout_rate=0.3,  # UNETR
     )
