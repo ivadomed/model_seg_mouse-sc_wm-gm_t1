@@ -155,10 +155,10 @@ train_transforms = Compose(
         ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
                                         relative=False),
         # ScaleIntensityd(keys=["image"]),
-        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
-        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=1.0, spatial_size=(200, 200),
-                    translate_range=(0.2, 0.2), rotate_range=(np.pi/10, np.pi/10), scale_range=(0.15, 0.15)),
+        # RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
+        # RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
+        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=0.5, spatial_size=(200, 200),
+                    translate_range=(20, 20), rotate_range=np.pi/30, scale_range=(0.1, 0.1)),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
