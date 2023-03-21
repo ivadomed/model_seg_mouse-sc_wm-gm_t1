@@ -175,9 +175,13 @@ train_transforms = Compose(
 val_transforms = train_transforms
 
 # TODO: Randomize train/val
-train_ds = PatchDataset(data=patch_data[:-5], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
+train_id = [0, 2, 3, 4, 6, 8, 10, 12, 14, 15, 17, 19, 20, 21, 23]
+val_id = [1, 5, 7, 9, 11, 13, 16, 18, 22]
+train_ds = PatchDataset(
+    data=[patch_data[i] for i in train_id], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
-val_ds = PatchDataset(data=patch_data[-5:], patch_func=patch_func, samples_per_image=1, transform=val_transforms)
+val_ds = PatchDataset(
+    data=[patch_data[i] for i in val_id], patch_func=patch_func, samples_per_image=1, transform=val_transforms)
 val_loader = DataLoader(val_ds, batch_size=1)
 
 # Create Model, Loss, Optimizer and Scheduler
