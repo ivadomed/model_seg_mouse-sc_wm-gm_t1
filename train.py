@@ -91,7 +91,7 @@ config = {
     "train_batch_size": 32,  # TODO: Change back to 2
     "val_batch_size": 32,
     "learning_rate": 1e-3,
-    "max_epochs": 200,
+    "max_epochs": 500,
     "val_interval": 10,  # check validation score after n epochs
     "lr_scheduler": "cosine_decay",  # just to keep track
 
