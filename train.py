@@ -88,8 +88,8 @@ config = {
     "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
     # train settings
-    "train_batch_size": 4,  # TODO: Change back to 2
-    "val_batch_size": 1,
+    "train_batch_size": 32,  # TODO: Change back to 2
+    "val_batch_size": 32,
     "learning_rate": 1e-3,
     "max_epochs": 200,
     "val_interval": 10,  # check validation score after n epochs
@@ -150,17 +150,17 @@ train_transforms = Compose(
     [
         AddChanneld(keys=["image", "label"]),
         # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
-        RandShiftIntensityd(keys="image", offsets=0.2, prob=0.5),
-        Rand2DElasticd(keys=["image", "label"], spacing=(30, 30), magnitude_range=(3, 3), prob=0.3),
+        # RandShiftIntensityd(keys="image", offsets=0.2, prob=0.5),
         # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
         # RandBiasFieldd(keys=["image"], degree=3, coeff_range=(0.0, 0.1)),
-        # ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
-        #                                 relative=False),
+        ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
+                                        relative=False),
         # ScaleIntensityd(keys=["image"]),
         RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
         # RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
         RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=0.5, spatial_size=(200, 200),
                     translate_range=(20, 20), rotate_range=np.pi/30, scale_range=(0.1, 0.1)),
+        Rand2DElasticd(keys=["image", "label"], spacing=(30, 30), magnitude_range=(3, 3), prob=0.3),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
