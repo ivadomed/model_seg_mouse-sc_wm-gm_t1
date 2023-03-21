@@ -36,7 +36,7 @@ from monai.transforms import (
     ToTensor,
 )
 
-from monai.networks.nets import UNet
+from monai.networks.nets import UNet, UNETR
 from monai.networks.layers import Norm
 from monai.metrics import DiceMetric
 from monai.losses import DiceLoss
@@ -87,6 +87,11 @@ config = {
     "cache_rate": 1.0,
     "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
 
+    # data augmentation (probability of occurrence)
+    "RandFlipd": 0.5,
+    "RandAffine": 0.5,
+    "Rand2DElastic": 0.3,
+
     # train settings
     "train_batch_size": 32,  # TODO: Change back to 2
     "val_batch_size": 32,
@@ -100,11 +105,15 @@ config = {
     "model_params": dict(spatial_dims=2,
                          in_channels=1,
                          out_channels=1,
-                         channels=(8, 16, 32, 64),
-                         strides=(2, 2, 2),
-                         num_res_units=2,
-                         norm=Norm.BATCH,
-                         dropout=0.3,
+                         # channels=(8, 16, 32, 64),  #UNet
+                         # strides=(2, 2, 2),  # UNet
+                         # num_res_units=2,  # UNet
+                         # norm=Norm.BATCH,  # UNet
+                         # dropout=0.3,  # UNet
+                         img_size=(192, 192),  # UNETR
+                         feature_size=32,  # UNETR
+                         norm_name='batch',  # UNETR
+                         dropout_rate=0.3,  # UNETR
     )
 }
 
@@ -156,11 +165,10 @@ train_transforms = Compose(
         ScaleIntensityRangePercentilesd(keys=["image"], lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True,
                                         relative=False),
         # ScaleIntensityd(keys=["image"]),
-        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-        # RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), prob=0.5, spatial_size=(200, 200),
-                    translate_range=(20, 20), rotate_range=np.pi/30, scale_range=(0.1, 0.1)),
-        Rand2DElasticd(keys=["image", "label"], spacing=(30, 30), magnitude_range=(3, 3), prob=0.3),
+        RandFlipd(keys=["image", "label"], prob=config['RandFlip'], spatial_axis=1),
+        RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), spatial_size=(192, 192),
+                    translate_range=(20, 20), rotate_range=np.pi/30, scale_range=(0.1, 0.1), prob=config['RandAffine']),
+        Rand2DElasticd(keys=["image", "label"], spacing=(30, 30), magnitude_range=(3, 3), prob=config['Rand2DElastic']),
         ToTensor(dtype=np.dtype('float32')),
     ]
 )
@@ -193,7 +201,7 @@ if device.type == 'cuda':
     print(f"device: {device}:{torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
 else:
     print(f"device: {device}")
-model = UNet(**config['model_params']).to(device)
+model = UNETR(**config['model_params']).to(device)
 # TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
 loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
@@ -273,7 +281,7 @@ for epoch in range(max_epochs):
                     val_data["label"].to(device),
                 )
                 # TODO: parametrize this
-                roi_size = (200, 200)
+                roi_size = (192, 192)
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model)

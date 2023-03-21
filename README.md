@@ -11,5 +11,6 @@ Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
 ~~~
 pip install "monai-weekly[gdown, nibabel, tqdm, ignite]"
 pip install wandb
+pip install einops
 pip install matplotlib
 ~~~
