@@ -12,6 +12,7 @@ import glob
 import numpy as np
 import shutil
 import tempfile
+from typing import List, Tuple
 
 import wandb
 import torch
@@ -50,6 +51,41 @@ from nibabel import load
 print_config()
 
 
+def interleave_indices(data: List, ratio: float) -> Tuple[List[int], List[int]]:
+    """
+    Interleave the list indices into two sets based on the given ratio.
+
+    :param data: The input list.
+    :param ratio: The ratio of the number of indices in the first set to the number of indices in the second set.
+    :return: A tuple of two lists of indices, where the first list contains indices for the first set,
+             and the second list contains indices for the second set.
+    """
+    num_items = len(data)
+    indices = list(range(num_items))
+
+    first_set_indices = []
+    second_set_indices = []
+
+    count_ratio = 0
+    current_set = 1
+
+    for index in indices:
+        if current_set == 1:
+            first_set_indices.append(index)
+            count_ratio += 1
+            if count_ratio >= ratio:
+                current_set = 2
+                count_ratio = 0
+        else:
+            second_set_indices.append(index)
+            count_ratio += 1
+            if count_ratio >= 1:
+                current_set = 1
+                count_ratio = 0
+
+    return first_set_indices, second_set_indices
+
+
 def match_images_and_labels(images, labels):
     """
     Assumes BIDS format.
@@ -86,6 +122,7 @@ config = {
     # data
     "cache_rate": 1.0,
     "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
+    "split_train_val_ratio": 3,
 
     # data augmentation (probability of occurrence)
     "RandFlip": 0.5,
@@ -105,15 +142,15 @@ config = {
     "model_params": dict(spatial_dims=2,
                          in_channels=1,
                          out_channels=1,
-                         # channels=(8, 16, 32, 64),  #UNet
-                         # strides=(2, 2, 2),  # UNet
-                         # num_res_units=2,  # UNet
-                         # norm=Norm.BATCH,  # UNet
-                         # dropout=0.3,  # UNet
-                         img_size=(192, 192),  # UNETR
-                         feature_size=16,  # UNETR
-                         norm_name='batch',  # UNETR
-                         dropout_rate=0.3,  # UNETR
+                         channels=(8, 16, 32, 64),  #UNet
+                         strides=(2, 2, 2),  # UNet
+                         num_res_units=2,  # UNet
+                         norm=Norm.BATCH,  # UNet
+                         dropout=0.3,  # UNet
+                         # img_size=(192, 192),  # UNETR
+                         # feature_size=16,  # UNETR
+                         # norm_name='batch',  # UNETR
+                         # dropout_rate=0.3,  # UNETR
     )
 }
 
@@ -184,9 +221,10 @@ train_transforms = Compose(
 #)
 val_transforms = train_transforms
 
-# TODO: Randomize train/val
-train_id = [0, 2, 3, 4, 6, 8, 10, 12, 14, 15, 17, 19, 20, 21, 23]
-val_id = [1, 5, 7, 9, 11, 13, 16, 18, 22]
+# Split train/validation datasets
+train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
+print("Set 1 indices:", train_id)
+print("Set 2 indices:", val_id)
 train_ds = PatchDataset(
     data=[patch_data[i] for i in train_id], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
@@ -201,7 +239,7 @@ if device.type == 'cuda':
     print(f"device: {device}:{torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
 else:
     print(f"device: {device}")
-model = UNETR(**config['model_params']).to(device)
+model = UNet(**config['model_params']).to(device)
 # TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
 loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
