@@ -51,6 +51,27 @@ from nibabel import load
 print_config()
 
 
+def split_indices(data: List, ratio: float) -> Tuple[List[int], List[int]]:
+    """
+    Split the list indices into two sets based on the given ratio.
+
+    :param data: The input list.
+    :param ratio: The ratio of the number of indices in the first set to the number of indices in the second set.
+    :return: A tuple of two lists of indices, where the first list contains indices for the first set,
+             and the second list contains indices for the second set.
+    """
+    num_items = len(data)
+    indices = list(range(num_items))
+
+    first_set_size = int(num_items * ratio / (ratio + 1))
+    second_set_size = num_items - first_set_size
+
+    first_set_indices = indices[:first_set_size]
+    second_set_indices = indices[first_set_size:first_set_size + second_set_size]
+
+    return first_set_indices, second_set_indices
+
+
 def interleave_indices(data: List, ratio: float) -> Tuple[List[int], List[int]]:
     """
     Interleave the list indices into two sets based on the given ratio.
@@ -222,6 +243,7 @@ train_transforms = Compose(
 val_transforms = train_transforms
 
 # Split train/validation datasets
+# TODO: consider using random split with split_indices() for final Ensemble model.
 train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
 print("Set 1 indices:", train_id)
 print("Set 2 indices:", val_id)
