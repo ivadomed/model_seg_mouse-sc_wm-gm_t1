@@ -360,12 +360,23 @@ for epoch in range(max_epochs):
                 # 🐝 show image with ground truth and prediction on eval dataset
                 # TODO: display subject name and slice number
                 slice_num = 45
+
+                # Convert val_outputs and val_labels to a tensor if it's a list
+                if isinstance(val_outputs, list):
+                    val_outputs = torch.stack(val_outputs)
+                if isinstance(val_labels, list):
+                    val_labels = torch.stack(val_labels)
+
+                # Log the images to wandb
+                # TODO: use hot palette for labels
                 wandb.log({"Validation_Image/Image":
-                               wandb.Image(val_inputs.cpu(), caption=f"Slice: {slice_num}")})
+                               wandb.Image(val_inputs.cpu().numpy()[0, 0], caption=f"Slice: {slice_num}")})
+                val_labels_scaled = np.uint8(val_labels.cpu().numpy()[0, 0] * 255 // 2)
                 wandb.log({"Validation_Image/Ground truth":
-                               wandb.Image(val_labels[0].cpu(), caption=f"Slice: {slice_num}")})
+                               wandb.Image(val_labels_scaled, caption=f"Slice: {slice_num}")})
+                val_outputs_scaled = np.uint8(val_outputs.cpu().numpy()[0, 0] * 255 // 2)
                 wandb.log({"Validation_Image/Prediction":
-                               wandb.Image(val_outputs[0].cpu(), caption=f"Slice: {slice_num}")})
+                               wandb.Image(val_outputs_scaled, caption=f"Slice: {slice_num}")})
 
             # 🐝 aggregate the final mean dice result
             metric = dice_metric.aggregate().item()
