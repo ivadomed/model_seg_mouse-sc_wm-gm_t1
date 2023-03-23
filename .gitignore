@@ -10,3 +10,5 @@ venv/
 # Wandb
 wandb/
 
+# Predictions
+prediction*.*
