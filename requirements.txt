@@ -1,0 +1,4 @@
+einops
+matplotlib
+monai-weekly[gdown, nibabel, tqdm, ignite]
+wandb

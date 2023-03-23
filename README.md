@@ -9,9 +9,5 @@ Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
 ## Installation
 
 ~~~
-pip install "monai-weekly[gdown, nibabel, tqdm, ignite]"
-pip install wandb
-pip install einops
-pip install matplotlib
-pip install tqdm
+pip install -r requirements.txt
 ~~~
