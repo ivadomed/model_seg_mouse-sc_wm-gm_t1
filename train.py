@@ -161,8 +161,8 @@ config = {
     # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
     "model_type": "unet",  # just to keep track
     "model_params": dict(spatial_dims=2,
-                         in_channels=2,
-                         out_channels=2,
+                         in_channels=1,
+                         out_channels=3,
                          channels=(8, 16, 32, 64),  #UNet
                          strides=(2, 2, 2),  # UNet
                          num_res_units=2,  # UNet
@@ -212,14 +212,14 @@ for data_dict in data_dicts:
         # If WM label is not empty, consider this as a pair of image/label for training
         if label_z_WM.sum() > 0:
             image_z = nii_image.get_fdata()[:, :, i_z]
-            label_z_GM = nii_label_GM.get_fdata()[:, :, i_z]
-            patch_data.append({'image': image_z, 'label': np.stack([label_z_WM, label_z_GM], axis=0)})
+            label_z_GM = nii_label_GM.get_fdata()[:, :, i_z] * 2
+            patch_data.append({'image': image_z, 'label': label_z_WM + label_z_GM})
 
 # TODO: optimize hyperparam:
 #  RandAffined
 train_transforms = Compose(
     [
-        AddChanneld(keys=["image"]),
+        AddChanneld(keys=["image", "label"]),
         # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
         # RandShiftIntensityd(keys="image", offsets=0.2, prob=0.5),
         # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
