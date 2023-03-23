@@ -54,6 +54,7 @@ from nibabel.nifti1 import Nifti1Image, save
 # Let's print configuration of some packages by using a utility function provided by MONAI as `print_config()` which
 # basically lists down all the versions of the useful libraries.
 
+from tqdm import tqdm
 
 
 import numpy as np
@@ -132,7 +133,7 @@ activations = Activations(sigmoid=True)
 as_discrete = AsDiscrete(threshold=0.5)
 
 with torch.no_grad():
-    for data in dataloader:
+    for data in tqdm(dataloader, desc="Processing images", unit="image"):
         image = data["image"].to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         output = model(image)
         output_sigmoid = activations(output)
