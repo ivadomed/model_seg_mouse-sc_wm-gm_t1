@@ -107,7 +107,7 @@ def interleave_indices(data: List, ratio: float) -> Tuple[List[int], List[int]]:
     return first_set_indices, second_set_indices
 
 
-def match_images_and_labels(images, labels):
+def match_images_and_labels(images, labels_WM, labels_GM):
     """
     Assumes BIDS format.
     :param images:
@@ -121,11 +121,11 @@ def match_images_and_labels(images, labels):
         # Fetch file name without extension
         filename = image.split(os.path.sep)[-1].split('.')[0]
         # Find equivalent in labels
-        # TODO: check if label has 2 entries
-        label = [j for i, j in enumerate(labels) if filename in j]
-        if label:
+        label_WM = [j for i, j in enumerate(labels_WM) if filename in j]
+        label_GM = [j for i, j in enumerate(labels_GM) if filename in j]
+        if label_WM and label_GM:
             images_match.append(image)
-            labels_match.append(label[0])
+            labels_match.append([label_WM[0], label_GM[0]])
     return images_match, labels_match
 
 
@@ -154,15 +154,15 @@ config = {
     "train_batch_size": 32,  # TODO: Change back to 2
     "val_batch_size": 32,
     "learning_rate": 1e-3,
-    "max_epochs": 500,
+    "max_epochs": 200,
     "val_interval": 10,  # check validation score after n epochs
     "lr_scheduler": "cosine_decay",  # just to keep track
 
     # Unet model (you can even use nested dictionary and this will be handled by W&B automatically)
     "model_type": "unet",  # just to keep track
     "model_params": dict(spatial_dims=2,
-                         in_channels=1,
-                         out_channels=1,
+                         in_channels=2,
+                         out_channels=2,
                          channels=(8, 16, 32, 64),  #UNet
                          strides=(2, 2, 2),  # UNet
                          num_res_units=2,  # UNet
@@ -191,31 +191,35 @@ root_dir = "./"
 # Set MSD dataset path
 # TODO: replace with https://github.com/ivadomed/templates/blob/main/dataset_conversion/create_msd_json_from_bids.py
 train_images = sorted(glob.glob(os.path.join(data_dir, "**", "*_T1w.nii.gz"), recursive=True))
-# TODO: also include GM mask
-train_labels = \
-    sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-WM_mask.nii.gz"), recursive=True))
-train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels)
-data_dicts = [{"image": image_name, "label": label_name}
+train_labels_WM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-WM_mask.nii.gz"), recursive=True))
+train_labels_GM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-GM_mask.nii.gz"), recursive=True))
+train_labels = train_labels_WM + train_labels_GM
+train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels_WM, train_labels_GM)
+data_dicts = [{"image": image_name, "label_WM": label_name[0], "label_GM": label_name[1]}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
 # TODO: add check if data empty
 
+# TODO: add tqdm
 # Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
 patch_data = []
 for data_dict in data_dicts:
     # i=1
     nii_image = load(data_dict['image'])
-    nii_label = load(data_dict['label'])
-    for i_z in range(nii_label.shape[2]):
-        image_z = nii_image.get_fdata()[:, :, i_z]
-        label_z = nii_label.get_fdata()[:, :, i_z]
-        if label_z.sum() > 0:
-            patch_data.append({'image': image_z, 'label': label_z})
+    nii_label_WM = load(data_dict['label_WM'])
+    nii_label_GM = load(data_dict['label_GM'])
+    for i_z in range(nii_label_WM.shape[2]):
+        label_z_WM = nii_label_WM.get_fdata()[:, :, i_z]
+        # If WM label is not empty, consider this as a pair of image/label for training
+        if label_z_WM.sum() > 0:
+            image_z = nii_image.get_fdata()[:, :, i_z]
+            label_z_GM = nii_label_GM.get_fdata()[:, :, i_z]
+            patch_data.append({'image': image_z, 'label': np.stack([label_z_WM, label_z_GM], axis=0)})
 
 # TODO: optimize hyperparam:
 #  RandAffined
 train_transforms = Compose(
     [
-        AddChanneld(keys=["image", "label"]),
+        AddChanneld(keys=["image"]),
         # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
         # RandShiftIntensityd(keys="image", offsets=0.2, prob=0.5),
         # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
@@ -263,7 +267,8 @@ else:
     print(f"device: {device}")
 model = UNet(**config['model_params']).to(device)
 # TODO: optimize params: https://docs.monai.io/en/stable/losses.html#diceloss
-loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
+# loss_function = DiceLoss(to_onehot_y=True, sigmoid=True)
+loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 scheduler = CosineAnnealingLR(optimizer, T_max=config['max_epochs'], eta_min=1e-9)
@@ -283,7 +288,8 @@ best_metric = -1
 best_metric_epoch = -1
 epoch_loss_values = []
 metric_values = []
-post_pred = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+# post_pred = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
 # post_label = Compose([AsDiscrete(to_onehot=2)])
 post_label = Compose()
 wandb_mask_logs = []
