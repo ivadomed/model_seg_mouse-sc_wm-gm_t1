@@ -379,6 +379,7 @@ for epoch in range(max_epochs):
                                wandb.Image(val_outputs_scaled, caption=f"Slice: {slice_num}")})
 
             # 🐝 aggregate the final mean dice result
+            # TODO: reported Dice for 2-class is over one, so need to check what's wrong...
             metric = dice_metric.aggregate().item()
 
             # 🐝 log validation dice score for each validation round
