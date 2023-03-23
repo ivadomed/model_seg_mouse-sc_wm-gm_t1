@@ -229,7 +229,7 @@ train_transforms = Compose(
         # ScaleIntensityd(keys=["image"]),
         RandFlipd(keys=["image", "label"], prob=config['RandFlip'], spatial_axis=1),
         RandAffined(keys=['image', 'label'], mode=('bilinear', 'nearest'), spatial_size=(192, 192),
-                    translate_range=(20, 20), rotate_range=np.pi/30, scale_range=(0.1, 0.1), prob=config['RandAffine']),
+                    translate_range=(20, 20), rotate_range=np.pi/2, scale_range=(0.2, 0.2), prob=config['RandAffine']),
         Rand2DElasticd(keys=["image", "label"], spacing=(30, 30), magnitude_range=(3, 3), prob=config['Rand2DElastic']),
         ToTensor(dtype=np.dtype('float32')),
     ]
