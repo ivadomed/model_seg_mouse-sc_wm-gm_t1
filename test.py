@@ -14,9 +14,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from monai.transforms import Activations, Compose, AddChanneld, AsDiscrete, CastToTyped, ScaleIntensityRangePercentilesd
-from monai.data import Dataset, DataLoader
+from monai.data import Dataset, DataLoader, decollate_batch
 from monai.networks.nets import UNet
 from monai.networks.layers import Norm
+from monai.inferers import sliding_window_inference
 
 
 # Used for debugging
@@ -43,7 +44,7 @@ def visualize_slices(volume, axis=0):
 model = UNet(
     spatial_dims=2,
     in_channels=1,
-    out_channels=1,
+    out_channels=3,
     channels=(8, 16, 32, 64),
     strides=(2, 2, 2),
     num_res_units=2,
@@ -51,7 +52,7 @@ model = UNet(
     dropout=0.3,
 )
 # Load the trained 2D U-Net model
-model_state = torch.load("/Users/julien/Desktop/best_metric_model.pth", map_location=torch.device('cpu'))
+model_state = torch.load("/Users/julien/Desktop/best_metric_model_v34.pth", map_location=torch.device('cpu'))
 model.load_state_dict(model_state)
 model.eval()
 
@@ -77,21 +78,61 @@ transforms = Compose(
 
 # Create the dataset and dataloader with the slices and transforms
 dataset = Dataset(data_list, transform=transforms)
+# TODO: update num_workers
 dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
 # Apply the model to each slice
 segmented_slices = []
-activations = Activations(sigmoid=True)
-as_discrete = AsDiscrete(threshold=0.5)
+activations = Activations(softmax=True)
+as_discrete = AsDiscrete(argmax=True)
+post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
 
 with torch.no_grad():
     for data in tqdm(dataloader, desc="Processing images", unit="image"):
         image = data["image"].to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        output = model(image)
-        output_sigmoid = activations(output)
-        output_discrete = as_discrete(output_sigmoid)
-        output_slice = output_discrete.squeeze().cpu().numpy()
-        segmented_slices.append(output_slice)
+        # output = model(image)
+
+        roi_size = (192, 192)  # maybe the culprit
+        sw_batch_size = 4
+        val_outputs = sliding_window_inference(
+            image, roi_size, sw_batch_size, model)
+
+        # TODO: consider optimizing prediction function below, because:
+        #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
+        #  vs. ~45image/s with using output = model(image)
+        val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
+        if isinstance(val_outputs, list):
+            val_outputs = torch.stack(val_outputs)
+
+        # print(f"val_outputs.max(): {val_outputs.max()}")
+
+        # output_softmax = activations(output)
+
+        # # Print statistics for each class
+        # for i in range(output_softmax.shape[1]):
+        #     print(
+        #         f"Class {i}: Min: {output_softmax[0, i].min().item()}, Max: {output_softmax[0, i].max().item()}, Mean: {output_softmax[0, i].mean().item()}")
+        #
+        # output_discrete = torch.argmax(output_softmax, dim=1).cpu().numpy()
+        # output_slice = output_discrete.squeeze()
+        segmented_slices.append(val_outputs.numpy().squeeze())
+        #
+        #
+        # output = model(image)
+        # output_sigmoid = activations(output)
+        # output_discrete = as_discrete(output_sigmoid)
+        # # Convert the multi-channel output back to a single channel representation
+        # # output_slice = torch.argmax(output_discrete, dim=1).squeeze().cpu().numpy()
+        # output_slice = output_discrete.squeeze().cpu().numpy()
+
+        # plt.figure("debug", (12, 6))
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(image[0, 0, :, :], cmap="gray")
+        # plt.title(f"image")
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(output[0], cmap="hot")
+        # plt.title(f"prediction")
+        # segmented_slices.append(output_slice)
 
 # Stack the segmented slices to create the segmented 3D volume
 segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -103,10 +144,10 @@ nib.save(segmented_nifti, "prediction.nii.gz")
 
 
 # For debugging
-# plt.figure("debug", (12, 6))
-# plt.subplot(1, 2, 1)
-# plt.imshow(image[0, 0, :, :], cmap="gray")
-# plt.title(f"image")
-# plt.subplot(1, 2, 2)
-# plt.imshow(output[0, 0, :, :], cmap="hot")
-# plt.title(f"prediction")
+plt.figure("debug", (12, 6))
+plt.subplot(1, 2, 1)
+plt.imshow(image[0, 0, :, :], cmap="gray")
+plt.title(f"image")
+plt.subplot(1, 2, 2)
+plt.imshow(output[0, 0, :, :], cmap="hot")
+plt.title(f"prediction")

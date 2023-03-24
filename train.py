@@ -355,6 +355,8 @@ for epoch in range(max_epochs):
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
+                # TODO: deal with: /Users/julien/code/model_seg_mouse-sc_wm-gm_t1/venv/lib/python3.10/site-packages/monai/metrics/utils.py:226: UserWarning: y_pred should be a binarized tensor.
+                #   warnings.warn(f"{name} should be a binarized tensor.")
                 dice_metric(y_pred=val_outputs, y=val_labels)
 
                 # 🐝 show image with ground truth and prediction on eval dataset
