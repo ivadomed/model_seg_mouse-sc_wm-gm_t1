@@ -341,7 +341,7 @@ for epoch in range(max_epochs):
     wandb.log({"Training/loss_epoch": epoch_loss})
     
     # 🐝 log learning rate after each epoch to wandb
-    wandb.log({"Training/learning_rate": scheduler.get_lr()[0]})
+    wandb.log({"Training/learning_rate": scheduler.get_last_lr()[0]})
 
     if (epoch + 1) % val_interval == 0:
         model.eval()
