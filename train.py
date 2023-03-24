@@ -213,7 +213,12 @@ for data_dict in data_dicts:
         if label_z_WM.sum() > 0:
             image_z = nii_image.get_fdata()[:, :, i_z]
             label_z_GM = nii_label_GM.get_fdata()[:, :, i_z] * 2
-            patch_data.append({'image': image_z, 'label': label_z_WM + label_z_GM})
+            patch_data.append({
+                'image': image_z,
+                'label': label_z_WM + label_z_GM,
+                'file': os.path.basename(data_dict['image']),
+                'slice': i_z
+            })
 
 # TODO: optimize hyperparam:
 #  RandAffined
@@ -358,28 +363,21 @@ for epoch in range(max_epochs):
                 dice_metric(y_pred=val_outputs, y=val_labels)
 
                 # 🐝 show image with ground truth and prediction on eval dataset
-                # TODO: display subject name and slice number
-                slice_num = 45
-
                 # Convert val_outputs and val_labels to a tensor if it's a list
                 if isinstance(val_outputs, list):
                     val_outputs = torch.stack(val_outputs)
                 if isinstance(val_labels, list):
                     val_labels = torch.stack(val_labels)
-
-                # Log the images to wandb
                 # TODO: use hot palette for labels
                 wandb.log({"Validation_Image/Image":
-                               wandb.Image(val_inputs.cpu().numpy().squeeze(), caption=f"Slice: {slice_num}")})
+                               wandb.Image(val_inputs.cpu().numpy().squeeze(),
+                                           caption=f"{val_data['file'][0]} (z={int(val_data['slice'])})")})
                 val_labels_scaled = np.uint8(torch.argmax(val_labels, dim=1).cpu().numpy().squeeze() * 255 // 2)
-                wandb.log({"Validation_Image/Ground truth":
-                               wandb.Image(val_labels_scaled, caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Ground truth": wandb.Image(val_labels_scaled)})
                 val_outputs_scaled = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze() * 255 // 2)
-                wandb.log({"Validation_Image/Prediction":
-                               wandb.Image(val_outputs_scaled, caption=f"Slice: {slice_num}")})
+                wandb.log({"Validation_Image/Prediction": wandb.Image(val_outputs_scaled)})
 
             # 🐝 aggregate the final mean dice result
-            # TODO: reported Dice for 2-class is over one, so need to check what's wrong...
             metric = dice_metric.aggregate().item()
 
             # 🐝 log validation dice score for each validation round
