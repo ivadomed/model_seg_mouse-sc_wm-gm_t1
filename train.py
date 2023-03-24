@@ -142,7 +142,7 @@ if 'CUDA_VISIBLE_DEVICES' not in os.environ:
 config = {
     # data
     "cache_rate": 1.0,
-    "num_workers": 2,  # TODO: Set back to larger number. Set to 0 to debug in Pycharm (avoid multiproc).
+    "num_workers": 2,  # TODO: Set to 0 to debug in Pycharm (avoid multiproc).
     "split_train_val_ratio": 3,
 
     # data augmentation (probability of occurrence)
@@ -151,7 +151,7 @@ config = {
     "Rand2DElastic": 0.3,
 
     # train settings
-    "train_batch_size": 32,  # TODO: Change back to 2
+    "train_batch_size": 32,
     "val_batch_size": 32,
     "learning_rate": 1e-3,
     "max_epochs": 200,
