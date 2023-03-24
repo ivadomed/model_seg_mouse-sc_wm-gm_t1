@@ -254,8 +254,8 @@ val_transforms = train_transforms
 # Split train/validation datasets
 # TODO: consider using random split with split_indices() for final Ensemble model.
 train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
-print("Set 1 indices:", train_id)
-print("Set 2 indices:", val_id)
+print("Train indices:", train_id)
+print("Validation indices:", val_id)
 train_ds = PatchDataset(
     data=[patch_data[i] for i in train_id], patch_func=patch_func, samples_per_image=1, transform=train_transforms)
 train_loader = DataLoader(train_ds, batch_size=1)
