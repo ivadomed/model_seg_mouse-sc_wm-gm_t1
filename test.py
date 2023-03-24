@@ -51,11 +51,14 @@ model = UNet(
     norm=Norm.BATCH,
     dropout=0.3,
 )
+
+# TODO: get these as input arg
 # Load the trained 2D U-Net model
 model_state = torch.load("/Users/julien/Desktop/best_metric_model_v34.pth", map_location=torch.device('cpu'))
 model.load_state_dict(model_state)
 model.eval()
 
+# TODO: get these as input arg
 # Load the 3D NIFTI volume
 filename = "/Users/julien/data.neuro/zurich-mouse/sub-mouse1/anat/sub-mouse1_chunk-1_T1w.nii.gz"
 nifti_volume = nib.load(filename)
@@ -90,49 +93,18 @@ post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
 with torch.no_grad():
     for data in tqdm(dataloader, desc="Processing images", unit="image"):
         image = data["image"].to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        # output = model(image)
-
-        roi_size = (192, 192)  # maybe the culprit
+        # TODO: parametrize values below
+        roi_size = (192, 192)
         sw_batch_size = 4
-        val_outputs = sliding_window_inference(
-            image, roi_size, sw_batch_size, model)
-
+        val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model)
         # TODO: consider optimizing prediction function below, because:
         #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
         #  vs. ~45image/s with using output = model(image)
+        #  See old code at a4637c05588511f0ca9da2f298b1effeed8fe880
         val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
         if isinstance(val_outputs, list):
             val_outputs = torch.stack(val_outputs)
-
-        # print(f"val_outputs.max(): {val_outputs.max()}")
-
-        # output_softmax = activations(output)
-
-        # # Print statistics for each class
-        # for i in range(output_softmax.shape[1]):
-        #     print(
-        #         f"Class {i}: Min: {output_softmax[0, i].min().item()}, Max: {output_softmax[0, i].max().item()}, Mean: {output_softmax[0, i].mean().item()}")
-        #
-        # output_discrete = torch.argmax(output_softmax, dim=1).cpu().numpy()
-        # output_slice = output_discrete.squeeze()
         segmented_slices.append(val_outputs.numpy().squeeze())
-        #
-        #
-        # output = model(image)
-        # output_sigmoid = activations(output)
-        # output_discrete = as_discrete(output_sigmoid)
-        # # Convert the multi-channel output back to a single channel representation
-        # # output_slice = torch.argmax(output_discrete, dim=1).squeeze().cpu().numpy()
-        # output_slice = output_discrete.squeeze().cpu().numpy()
-
-        # plt.figure("debug", (12, 6))
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(image[0, 0, :, :], cmap="gray")
-        # plt.title(f"image")
-        # plt.subplot(1, 2, 2)
-        # plt.imshow(output[0], cmap="hot")
-        # plt.title(f"prediction")
-        # segmented_slices.append(output_slice)
 
 # Stack the segmented slices to create the segmented 3D volume
 segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -141,13 +113,3 @@ segmented_volume = segmented_volume.astype(np.uint8)
 # Save the segmented volume as a NIFTI file
 segmented_nifti = nib.Nifti1Image(segmented_volume, nifti_volume.affine)
 nib.save(segmented_nifti, "prediction.nii.gz")
-
-
-# For debugging
-plt.figure("debug", (12, 6))
-plt.subplot(1, 2, 1)
-plt.imshow(image[0, 0, :, :], cmap="gray")
-plt.title(f"image")
-plt.subplot(1, 2, 2)
-plt.imshow(output[0, 0, :, :], cmap="hot")
-plt.title(f"prediction")
