@@ -289,9 +289,9 @@ best_metric_epoch = -1
 epoch_loss_values = []
 metric_values = []
 # post_pred = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
-post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
-# post_label = Compose([AsDiscrete(to_onehot=2)])
-post_label = Compose()
+post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
+post_label = Compose([AsDiscrete(to_onehot=3)])
+# post_label = Compose()
 wandb_mask_logs = []
 wandb_img_logs = []
 
