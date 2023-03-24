@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt
 from monai.utils import first, set_determinism
 from monai.transforms import (
     Activations,
-    AddChanneld,
     AsDiscrete,
     Compose,
+    EnsureChannelFirstd,
     Rand2DElasticd,
     RandAffined,
     RandBiasFieldd,
@@ -213,9 +213,10 @@ for data_dict in data_dicts:
         if label_z_WM.sum() > 0:
             image_z = nii_image.get_fdata()[:, :, i_z]
             label_z_GM = nii_label_GM.get_fdata()[:, :, i_z] * 2
+            label_z = label_z_WM + label_z_GM
             patch_data.append({
-                'image': image_z,
-                'label': label_z_WM + label_z_GM,
+                'image': np.expand_dims(image_z, axis=0),
+                'label': np.expand_dims(label_z, axis=0),
                 'file': os.path.basename(data_dict['image']),
                 'slice': i_z
             })
@@ -224,7 +225,7 @@ for data_dict in data_dicts:
 #  RandAffined
 train_transforms = Compose(
     [
-        AddChanneld(keys=["image", "label"]),
+        EnsureChannelFirstd(keys=["image", "label"], channel_dim=0),
         # RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
         # RandShiftIntensityd(keys="image", offsets=0.2, prob=0.5),
         # RandHistogramShiftd(keys=["image"], num_control_points=10, prob=1.0),
