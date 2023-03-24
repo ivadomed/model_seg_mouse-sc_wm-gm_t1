@@ -13,8 +13,9 @@ import numpy as np
 import shutil
 import tempfile
 from typing import List, Tuple
-
+from tqdm import tqdm
 import wandb
+
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import matplotlib.pyplot as plt
@@ -199,11 +200,9 @@ data_dicts = [{"image": image_name, "label_WM": label_name[0], "label_GM": label
               for image_name, label_name in zip(train_images_match, train_labels_match)]
 # TODO: add check if data empty
 
-# TODO: add tqdm
 # Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
 patch_data = []
-for data_dict in data_dicts:
-    # i=1
+for data_dict in tqdm(data_dicts, desc="Load images", unit="image"):
     nii_image = load(data_dict['image'])
     nii_label_WM = load(data_dict['label_WM'])
     nii_label_GM = load(data_dict['label_GM'])
@@ -215,7 +214,7 @@ for data_dict in data_dicts:
             label_z_GM = nii_label_GM.get_fdata()[:, :, i_z] * 2
             label_z = label_z_WM + label_z_GM
             patch_data.append({
-                'image': np.expand_dims(image_z, axis=0),
+                'image': np.expand_dims(image_z, axis=0),  # Expand because torch expects channel at dim=0
                 'label': np.expand_dims(label_z, axis=0),
                 'file': os.path.basename(data_dict['image']),
                 'slice': i_z
