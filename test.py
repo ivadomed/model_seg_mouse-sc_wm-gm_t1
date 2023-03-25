@@ -84,19 +84,17 @@ def main():
         [
             EnsureChannelFirstd(keys, channel_dim=0),
             ScaleIntensityRangePercentilesd(keys, lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True, relative=False),
-            CastToTyped(keys, dtype=torch.float32),  # convert to float32 tensors
+            CastToTyped(keys, dtype=torch.float32),
         ]
     )
 
     # Create the dataset and dataloader with the slices and transforms
     dataset = Dataset(data_list, transform=transforms)
     # TODO: update num_workers
-    dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
+    dataloader = DataLoader(dataset, batch_size=4, num_workers=2)
 
     # Apply the model to each slice
     segmented_slices = []
-    activations = Activations(softmax=True)
-    as_discrete = AsDiscrete(argmax=True)
     post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
 
     with torch.no_grad():
