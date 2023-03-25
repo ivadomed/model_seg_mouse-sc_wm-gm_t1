@@ -21,25 +21,6 @@ from monai.networks.layers import Norm
 from monai.inferers import sliding_window_inference
 
 
-# Used for debugging
-import matplotlib.pyplot as plt
-def visualize_slices(volume, axis=0):
-    assert axis in (0, 1, 2), "Invalid axis, should be 0, 1, or 2."
-
-    num_slices = volume.shape[axis]
-
-    for i in range(num_slices):
-        plt.figure()
-        if axis == 0:
-            plt.imshow(volume[i, :, :], cmap='gray')
-        elif axis == 1:
-            plt.imshow(volume[:, i, :], cmap='gray')
-        else:
-            plt.imshow(volume[:, :, i], cmap='gray')
-        plt.title(f"Slice {i}")
-        plt.axis('off')
-        plt.show()
-
 def main():
     # Get CLI argument
     parser = argparse.ArgumentParser(description="Segment spinal cord white and gray matter. The function outputs a "
@@ -90,8 +71,7 @@ def main():
 
     # Create the dataset and dataloader with the slices and transforms
     dataset = Dataset(data_list, transform=transforms)
-    # TODO: update num_workers
-    dataloader = DataLoader(dataset, batch_size=1, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
     # Apply the model to each slice
     segmented_slices = []
@@ -129,6 +109,7 @@ if __name__ == "__main__":
 
 
 # DEBUGGING CODE
+# import matplotlib.pyplot as plt
 # plt.figure("check", (12, 6))
 # plt.subplot(1, 2, 1)
 # plt.title("image")
