@@ -13,7 +13,8 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from monai.transforms import Activations, Compose, AddChanneld, AsDiscrete, CastToTyped, ScaleIntensityRangePercentilesd
+from monai.transforms import Activations, Compose, EnsureChannelFirstd, AsDiscrete, CastToTyped, \
+    ScaleIntensityRangePercentilesd
 from monai.data import Dataset, DataLoader, decollate_batch
 from monai.networks.nets import UNet
 from monai.networks.layers import Norm
@@ -64,16 +65,16 @@ filename = "/Users/julien/data.neuro/zurich-mouse/sub-mouse1/anat/sub-mouse1_chu
 nifti_volume = nib.load(filename)
 volume = nifti_volume.get_fdata()
 
+# Create a list of dictionaries with the 2D slices
+data_list = [{"image": np.expand_dims(volume[..., 0], axis=0)} for i in range(volume.shape[-1])]
+
 # Prepare the keys for the dictionary used by MONAI transforms
 keys = ["image"]
-
-# Create a list of dictionaries with the 2D slices
-data_list = [{"image": volume[..., i]} for i in range(volume.shape[-1])]
 
 # Define the transforms to apply to the slices
 transforms = Compose(
     [
-        AddChanneld(keys),
+        EnsureChannelFirstd(keys, channel_dim=0),
         ScaleIntensityRangePercentilesd(keys, lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True, relative=False),
         CastToTyped(keys, dtype=torch.float32),  # convert to float32 tensors
     ]
