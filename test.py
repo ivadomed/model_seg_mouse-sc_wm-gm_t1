@@ -54,7 +54,7 @@ model = UNet(
 
 # TODO: get these as input arg
 # Load the trained 2D U-Net model
-model_state = torch.load("/Users/julien/Desktop/best_metric_model_v34.pth", map_location=torch.device('cpu'))
+model_state = torch.load("best_metric_model.pth", map_location=torch.device('cpu'))
 model.load_state_dict(model_state)
 model.eval()
 
