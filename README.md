@@ -16,7 +16,7 @@ git clone https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1.git
 cd model_seg_mouse-sc_wm-gm_t1
 ~~~
 
-We recommend installing under a [virtual environment](https://docs.python.org/3/library/venv.html). Then run:
+We recommend installing a [virtual environment](https://docs.python.org/3/library/venv.html). Once installed, activate it and run:
 ~~~
 pip install -r requirements.txt
 ~~~
