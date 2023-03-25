@@ -1,6 +1,6 @@
 """
 Spinal cord white and gray matter segmentation (2 classes) using 2D kernel based on MONAI, with WandB monitoring.
-
+It assumes the file "best_metric_model.pth" is locally present.
 To launch:
 
     python test.py
@@ -10,7 +10,6 @@ To launch:
 import numpy as np
 import nibabel as nib
 import torch
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from monai.transforms import Activations, Compose, EnsureChannelFirstd, AsDiscrete, CastToTyped, \
@@ -21,23 +20,24 @@ from monai.networks.layers import Norm
 from monai.inferers import sliding_window_inference
 
 
-# Used for debugging
-def visualize_slices(volume, axis=0):
-    assert axis in (0, 1, 2), "Invalid axis, should be 0, 1, or 2."
-
-    num_slices = volume.shape[axis]
-
-    for i in range(num_slices):
-        plt.figure()
-        if axis == 0:
-            plt.imshow(volume[i, :, :], cmap='gray')
-        elif axis == 1:
-            plt.imshow(volume[:, i, :], cmap='gray')
-        else:
-            plt.imshow(volume[:, :, i], cmap='gray')
-        plt.title(f"Slice {i}")
-        plt.axis('off')
-        plt.show()
+# # Used for debugging
+# import matplotlib.pyplot as plt
+# def visualize_slices(volume, axis=0):
+#     assert axis in (0, 1, 2), "Invalid axis, should be 0, 1, or 2."
+#
+#     num_slices = volume.shape[axis]
+#
+#     for i in range(num_slices):
+#         plt.figure()
+#         if axis == 0:
+#             plt.imshow(volume[i, :, :], cmap='gray')
+#         elif axis == 1:
+#             plt.imshow(volume[:, i, :], cmap='gray')
+#         else:
+#             plt.imshow(volume[:, :, i], cmap='gray')
+#         plt.title(f"Slice {i}")
+#         plt.axis('off')
+#         plt.show()
 
 
 # Instantiate the 2D U-Net model with appropriate parameters
@@ -53,7 +53,6 @@ model = UNet(
     dropout=0.3,
 )
 
-# TODO: get these as input arg
 # Load the trained 2D U-Net model
 model_state = torch.load("best_metric_model.pth", map_location=torch.device('cpu'))
 model.load_state_dict(model_state)
