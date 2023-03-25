@@ -21,24 +21,24 @@ from monai.networks.layers import Norm
 from monai.inferers import sliding_window_inference
 
 
-# # Used for debugging
-# import matplotlib.pyplot as plt
-# def visualize_slices(volume, axis=0):
-#     assert axis in (0, 1, 2), "Invalid axis, should be 0, 1, or 2."
-#
-#     num_slices = volume.shape[axis]
-#
-#     for i in range(num_slices):
-#         plt.figure()
-#         if axis == 0:
-#             plt.imshow(volume[i, :, :], cmap='gray')
-#         elif axis == 1:
-#             plt.imshow(volume[:, i, :], cmap='gray')
-#         else:
-#             plt.imshow(volume[:, :, i], cmap='gray')
-#         plt.title(f"Slice {i}")
-#         plt.axis('off')
-#         plt.show()
+# Used for debugging
+import matplotlib.pyplot as plt
+def visualize_slices(volume, axis=0):
+    assert axis in (0, 1, 2), "Invalid axis, should be 0, 1, or 2."
+
+    num_slices = volume.shape[axis]
+
+    for i in range(num_slices):
+        plt.figure()
+        if axis == 0:
+            plt.imshow(volume[i, :, :], cmap='gray')
+        elif axis == 1:
+            plt.imshow(volume[:, i, :], cmap='gray')
+        else:
+            plt.imshow(volume[:, :, i], cmap='gray')
+        plt.title(f"Slice {i}")
+        plt.axis('off')
+        plt.show()
 
 def main():
     # Get CLI argument
@@ -74,7 +74,7 @@ def main():
     volume = nifti_volume.get_fdata()
 
     # Create a list of dictionaries with the 2D slices
-    data_list = [{"image": np.expand_dims(volume[..., 0], axis=0)} for i in range(volume.shape[-1])]
+    data_list = [{"image": np.expand_dims(volume[..., i], axis=0)} for i in range(volume.shape[-1])]
 
     # Prepare the keys for the dictionary used by MONAI transforms
     keys = ["image"]
@@ -91,11 +91,11 @@ def main():
     # Create the dataset and dataloader with the slices and transforms
     dataset = Dataset(data_list, transform=transforms)
     # TODO: update num_workers
-    dataloader = DataLoader(dataset, batch_size=4, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=1, num_workers=4)
 
     # Apply the model to each slice
     segmented_slices = []
-    post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True)])
+    post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
 
     with torch.no_grad():
         for data in tqdm(dataloader, desc="Process image", unit="image"):
@@ -111,7 +111,9 @@ def main():
             val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
             if isinstance(val_outputs, list):
                 val_outputs = torch.stack(val_outputs)
-            segmented_slices.append(val_outputs.numpy().squeeze())
+            segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
+            # print(segmented_slice.max())
+            segmented_slices.append(segmented_slice)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -124,3 +126,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# DEBUGGING CODE
+# plt.figure("check", (12, 6))
+# plt.subplot(1, 2, 1)
+# plt.title("image")
+# plt.imshow(image[0, 0, :, :].squeeze(), cmap="gray")
+# plt.subplot(1, 2, 2)
+# plt.title("prediction")
+# plt.imshow(val_outputs[0, 1, :, :].squeeze(), cmap="hot")
