@@ -26,3 +26,7 @@ pip install -r requirements.txt
 ~~~
 python test.py -i NIFTI_IMAGE
 ~~~
+
+## Notes
+
+Before running the segmentation, make sure the image orientation is correct. More details [here](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/25). 
