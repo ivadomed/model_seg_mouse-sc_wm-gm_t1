@@ -10,6 +10,7 @@ To launch:
 import argparse
 import numpy as np
 import nibabel as nib
+import os
 import torch
 from tqdm import tqdm
 
@@ -21,6 +22,18 @@ from monai.networks.layers import Norm
 from monai.inferers import sliding_window_inference
 
 
+def add_suffix_to_filename(filename, suffix):
+    name, ext = os.path.splitext(filename)
+
+    # Check if there is a double extension
+    if ext.lower() in {'.gz', '.bz2', '.xz'}:
+        name, ext2 = os.path.splitext(name)
+        ext = ext2 + ext
+
+    output_filename = f"{name}{suffix}{ext}"
+    return output_filename
+
+
 def main():
     # Get CLI argument
     parser = argparse.ArgumentParser(description="Segment spinal cord white and gray matter. The function outputs a "
@@ -30,7 +43,7 @@ def main():
                                                  "'best_metric_model.pth' is present in the local directory")
     parser.add_argument("-i", "--input", type=str, required=True, help="NIfTI file to process.")
     args = parser.parse_args()
-    filename = args.input
+    fname_in = args.input
 
     # Instantiate the 2D U-Net model with appropriate parameters
     # You need to replace num_classes, channels, strides, and kernel_size with the values used in your trained model
@@ -51,7 +64,7 @@ def main():
     model.eval()
 
     # Load the 3D NIFTI volume
-    nifti_volume = nib.load(filename)
+    nifti_volume = nib.load(fname_in)
     volume = nifti_volume.get_fdata()
 
     # Create a list of dictionaries with the 2D slices
@@ -100,8 +113,10 @@ def main():
     segmented_volume = segmented_volume.astype(np.uint8)
 
     # Save the segmented volume as a NIFTI file
+    fname_out = add_suffix_to_filename(fname_in, '_seg')
     segmented_nifti = nib.Nifti1Image(segmented_volume, nifti_volume.affine)
-    nib.save(segmented_nifti, "prediction.nii.gz")
+    nib.save(segmented_nifti, fname_out)
+    print(f"Done! Output file: {fname_out}")
 
 
 if __name__ == "__main__":
