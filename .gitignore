@@ -6,6 +6,7 @@ venv/
 
 # Wandb
 wandb/
+artifacts/
 
 # Predictions
 prediction*.*
