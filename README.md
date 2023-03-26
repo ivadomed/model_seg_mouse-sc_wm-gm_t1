@@ -2,6 +2,8 @@
 
 https://user-images.githubusercontent.com/2482071/227744144-ff9b21c3-d757-4e4c-a990-f6d7bf3084b0.mov
 
+## Citation
+
 Publication linked to the dataset: https://pubmed.ncbi.nlm.nih.gov/35585865/
 
 Publication linked to this model: TODO (see https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/26)
