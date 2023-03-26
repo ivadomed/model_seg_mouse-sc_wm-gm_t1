@@ -4,9 +4,7 @@ https://user-images.githubusercontent.com/2482071/227744144-ff9b21c3-d757-4e4c-a
 
 Publication linked to the dataset: https://pubmed.ncbi.nlm.nih.gov/35585865/
 
-Dataset: TODO
-
-Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
+Publication linked to this model: TODO (see https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/26)
 
 ## Installation
 
@@ -21,7 +19,18 @@ We recommend installing a [virtual environment](https://docs.python.org/3/librar
 pip install -r requirements.txt
 ~~~
 
-## Run segmentation
+## Train model
+
+Dataset (internal git-annex): `zurich-mouse`
+
+Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
+
+Example of training using GPU #0 and wandb group called "awesome-model" (for live monitoring):
+~~~
+export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; python train.py
+~~~
+
+## Test model
 
 ~~~
 python test.py -i NIFTI_IMAGE
@@ -29,4 +38,4 @@ python test.py -i NIFTI_IMAGE
 
 ## Notes
 
-Before running the segmentation, make sure the image orientation is correct. More details [here](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/25). 
+Before applying the model, make sure the image orientation is correct. More details [here](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/25). 
