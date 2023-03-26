@@ -6,7 +6,7 @@ https://user-images.githubusercontent.com/2482071/227744144-ff9b21c3-d757-4e4c-a
 
 Publication linked to the dataset: https://pubmed.ncbi.nlm.nih.gov/35585865/
 
-Publication linked to this model: TODO (see https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/26)
+Publication linked to this model: see [CITATION.cff](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/CITATION.cff)
 
 ## Installation
 
