@@ -10,8 +10,6 @@ To launch:
 import os
 import glob
 import numpy as np
-import shutil
-import tempfile
 from typing import List, Tuple
 from tqdm import tqdm
 import wandb
@@ -28,12 +26,7 @@ from monai.transforms import (
     EnsureChannelFirstd,
     Rand2DElasticd,
     RandAffined,
-    RandBiasFieldd,
     RandFlipd,
-    RandHistogramShiftd,
-    RandScaleIntensityd,
-    RandShiftIntensityd,
-    ScaleIntensityd,
     ScaleIntensityRangePercentilesd,
     ToTensor,
 )
@@ -198,7 +191,10 @@ train_labels = train_labels_WM + train_labels_GM
 train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels_WM, train_labels_GM)
 data_dicts = [{"image": image_name, "label_WM": label_name[0], "label_GM": label_name[1]}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
-# TODO: add check if data empty
+
+# Check if variable data_dicts is empty
+if not data_dicts:
+    raise ValueError("No data found. Please check your data directory.")
 
 # Iterate across image/label 3D volume, fetch non-empty slice and output a single list of image/label pair
 patch_data = []
