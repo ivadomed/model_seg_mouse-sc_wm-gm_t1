@@ -32,6 +32,8 @@ Example of training using GPU #0 and wandb group called "awesome-model" (for liv
 export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; python train.py
 ~~~
 
+Monitoring of model with wandb: https://wandb.ai/jcohenadad/mouse-zurich?workspace=user-jcohenadad
+
 ## Test model
 
 ~~~
