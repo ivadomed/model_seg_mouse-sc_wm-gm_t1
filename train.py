@@ -101,6 +101,34 @@ def interleave_indices(data: List, ratio: float) -> Tuple[List[int], List[int]]:
     return first_set_indices, second_set_indices
 
 
+def create_train_val_indices(len_list, seed, val_ratio=0.2):
+    """
+    Creates train and validation index lists based on the input length.
+
+    Parameters:
+        len_list (int): Length of the full data.
+        seed (int): Seed for random generator.
+        val_ratio (float, optional): Ratio of validation data. Defaults to 0.2.
+
+    Returns:
+        tuple: (train_indices, val_indices)
+    """
+    # Set the random seed for reproducibility
+    torch.manual_seed(seed)
+
+    # Create a list of indices from 0 to len_list-1
+    indices = torch.randperm(len_list)
+
+    # Calculate the number of validation samples
+    num_val_samples = int(len_list * val_ratio)
+
+    # Split the indices into train and validation lists
+    val_indices = indices[:num_val_samples]
+    train_indices = indices[num_val_samples:]
+
+    return train_indices.tolist(), val_indices.tolist()
+
+
 def match_images_and_labels(images, labels_WM, labels_GM):
     """
     Assumes BIDS format.
@@ -250,8 +278,10 @@ train_transforms = Compose(
 val_transforms = train_transforms
 
 # Split train/validation datasets
-# TODO: consider using random split with split_indices() for final Ensemble model.
-train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
+# TODO: parametrize seed
+seed = 42
+train_id, val_id = create_train_val_indices(len(patch_data), seed)
+# train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
 print("Train indices:", train_id)
 print("Validation indices:", val_id)
 train_ds = PatchDataset(
