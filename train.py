@@ -5,6 +5,15 @@ To launch:
 
     export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; python train.py
 
+Environment variables:
+
+    CUDA_VISIBLE_DEVICES: GPU to use (string)
+    PATH_DATA_ZURICH_MOUSE: path to the data directory
+    SEED: random seed
+    WANDB_RUN_GROUP: name of the group of runs
+    WANDB_RUN_NAME: name of the run
+    WANDB_PROJECT: name of the project
+    for all wandb environment variables, see https://docs.wandb.ai/guides/track/advanced/environment-variables
 """
 
 import os
