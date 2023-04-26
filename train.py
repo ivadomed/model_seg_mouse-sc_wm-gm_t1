@@ -217,7 +217,6 @@ root_dir = "./"
 train_images = sorted(glob.glob(os.path.join(data_dir, "**", "*_T1w.nii.gz"), recursive=True))
 train_labels_WM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-WM_mask.nii.gz"), recursive=True))
 train_labels_GM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-GM_mask.nii.gz"), recursive=True))
-train_labels = train_labels_WM + train_labels_GM
 train_images_match, train_labels_match = match_images_and_labels(train_images, train_labels_WM, train_labels_GM)
 data_dicts = [{"image": image_name, "label_WM": label_name[0], "label_GM": label_name[1]}
               for image_name, label_name in zip(train_images_match, train_labels_match)]
