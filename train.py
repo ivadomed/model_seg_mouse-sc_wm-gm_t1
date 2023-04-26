@@ -110,6 +110,7 @@ def match_images_and_labels(images, labels_WM, labels_GM):
     """
     images_match = []
     labels_match = []
+    print("Matched image and labels:")
     # Loop across images
     for image in images:
         # Fetch file name without extension
@@ -120,6 +121,7 @@ def match_images_and_labels(images, labels_WM, labels_GM):
         if label_WM and label_GM:
             images_match.append(image)
             labels_match.append([label_WM[0], label_GM[0]])
+            print(f"- {image}")
     return images_match, labels_match
 
 
