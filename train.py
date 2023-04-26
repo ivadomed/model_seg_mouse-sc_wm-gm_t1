@@ -183,7 +183,7 @@ config = {
     # data
     "cache_rate": 1.0,
     "num_workers": 2,  # TODO: Set to 0 to debug in Pycharm (avoid multiproc).
-    "split_train_val_ratio": 3,
+    "val_ratio": 0.2,
     "seed": seed,
 
     # data augmentation (probability of occurrence)
@@ -288,7 +288,7 @@ train_transforms = Compose(
 val_transforms = train_transforms
 
 # Split train/validation datasets
-train_id, val_id = create_train_val_indices(len(patch_data), seed)
+train_id, val_id = create_train_val_indices(len(patch_data), seed, config['val_ratio'])
 # train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
 print("Train indices:", train_id)
 print("Validation indices:", val_id)
