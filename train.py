@@ -167,9 +167,10 @@ def patch_func(dataset):
     return [dataset]
 
 
+# Set parameters
+project_name = "mouse-zurich"
+
 # Fetch environment variables
-if 'CUDA_VISIBLE_DEVICES' not in os.environ:
-    os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 if 'PATH_DATA_ZURICH_MOUSE' in os.environ:
     data_dir = os.environ.get("PATH_DATA_ZURICH_MOUSE")
 else:
@@ -183,6 +184,7 @@ config = {
     "cache_rate": 1.0,
     "num_workers": 2,  # TODO: Set to 0 to debug in Pycharm (avoid multiproc).
     "split_train_val_ratio": 3,
+    "seed": seed,
 
     # data augmentation (probability of occurrence)
     "RandFlip": 0.5,
@@ -286,8 +288,6 @@ train_transforms = Compose(
 val_transforms = train_transforms
 
 # Split train/validation datasets
-# TODO: parametrize seed
-seed = 42
 train_id, val_id = create_train_val_indices(len(patch_data), seed)
 # train_id, val_id = interleave_indices(patch_data, config['split_train_val_ratio'])
 print("Train indices:", train_id)
@@ -318,7 +318,7 @@ scheduler = CosineAnnealingLR(optimizer, T_max=config['max_epochs'], eta_min=1e-
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 # 🐝 initialize a wandb run
-wandb.init(project="mouse-zurich", config=config)
+wandb.init(project=project_name, config=config)
 
 # 🐝 log gradients of the model to wandb
 wandb.watch(model, log_freq=100)
