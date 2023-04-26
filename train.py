@@ -216,6 +216,9 @@ config = {
     )
 }
 
+# 🐝 initialize a wandb run
+wandb.init(project=project_name, config=config)
+
 # Setup data directory
 print(f"Path to data: {data_dir}")
 # TODO: check dataset integrity
@@ -316,9 +319,6 @@ scheduler = CosineAnnealingLR(optimizer, T_max=config['max_epochs'], eta_min=1e-
 
 # To avoid https://github.com/jcohenadad/model-seg-ms-mp2rage-monai/issues/1
 torch.multiprocessing.set_sharing_strategy('file_system')
-
-# 🐝 initialize a wandb run
-wandb.init(project=project_name, config=config)
 
 # 🐝 log gradients of the model to wandb
 wandb.watch(model, log_freq=100)
