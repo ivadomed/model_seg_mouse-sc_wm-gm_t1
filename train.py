@@ -3,7 +3,7 @@ Spinal cord white and gray matter segmentation (2 classes) using 2D kernel based
 
 To launch:
 
-    export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; python train.py
+    export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; export SEED="3"; python train.py
 
 Environment variables:
 
