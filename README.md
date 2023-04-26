@@ -23,13 +23,16 @@ pip install -r requirements.txt
 
 ## Train model
 
-Dataset (internal git-annex): `zurich-mouse`
+Download dataset (internal git-annex): `zurich-mouse`
 
-Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
+Define the following environment variables:
+~~~
+PATH_DATA_ZURICH_MOUSE=/path/to/zurich-mouse
+~~~
 
 Example of training using GPU #0 and wandb group called "awesome-model" (for live monitoring):
 ~~~
-export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="GROUP_NAME"; python train.py
+export CUDA_VISIBLE_DEVICES="0"; export WANDB_RUN_GROUP="awesome-model"; python train.py
 ~~~
 
 ## Test model
@@ -39,5 +42,7 @@ python test.py -i NIFTI_IMAGE
 ~~~
 
 ## Notes
+
+Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
 
 Before applying the model, make sure the image orientation is correct. More details [here](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/25). 
