@@ -158,9 +158,15 @@ def patch_func(dataset):
     return [dataset]
 
 
-# Set default GPU number
+# Fetch environment variables
 if 'CUDA_VISIBLE_DEVICES' not in os.environ:
     os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+if 'PATH_DATA_ZURICH_MOUSE' in os.environ:
+    data_dir = os.environ.get("PATH_DATA_ZURICH_MOUSE")
+else:
+    raise ValueError("Please set the environment variable PATH_DATA_ZURICH_MOUSE to the path of the dataset.")
+seed = int(os.environ['SEED']) if 'SEED' in os.environ else 0
+
 
 # Training parameters
 config = {
@@ -200,20 +206,14 @@ config = {
 }
 
 # Setup data directory
-# TODO: parametrize input data dir
-default_data_dir = "/Users/julien/data.neuro/zurich-mouse"
-env_data_dir = os.environ.get("PATH_DATA_ZURICH_MOUSE")
-data_dir = default_data_dir if env_data_dir is None else env_data_dir
 print(f"Path to data: {data_dir}")
 # TODO: check dataset integrity
 # data: data.neuro.polymtl.ca:/datasets/basel-mp2rage
 # commit: ffe427d4d1f62832e5f3567c8ce814eeff9b9764
 
 # Setup output directory
-# TODO: parametrize
 root_dir = "./"
 # Set MSD dataset path
-# TODO: replace with https://github.com/ivadomed/templates/blob/main/dataset_conversion/create_msd_json_from_bids.py
 train_images = sorted(glob.glob(os.path.join(data_dir, "**", "*_T1w.nii.gz"), recursive=True))
 train_labels_WM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-WM_mask.nii.gz"), recursive=True))
 train_labels_GM = sorted(glob.glob(os.path.join(data_dir, "derivatives", "**", "*_label-GM_mask.nii.gz"), recursive=True))
