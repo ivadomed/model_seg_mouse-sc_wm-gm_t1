@@ -89,6 +89,7 @@ def main():
         model.load_state_dict(model_state)
         model.eval()
         models.append(model)
+    print(f"Using models: {path_models}")
 
     # Define the post-processing transforms to apply to the model output
     post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
