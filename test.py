@@ -1,6 +1,6 @@
 """
 Spinal cord white and gray matter segmentation (2 classes) using 2D kernel based on MONAI, with WandB monitoring.
-It assumes the file "best_metric_model.pth" is locally present.
+It assumes the file(s) "best_metric_model*.pth" is locally present.
 To launch:
 
     python segment.py -i IMAGE
@@ -45,24 +45,6 @@ def main():
     args = parser.parse_args()
     fname_in = args.input
 
-    # Instantiate the 2D U-Net model with appropriate parameters
-    # You need to replace num_classes, channels, strides, and kernel_size with the values used in your trained model
-    model = UNet(
-        spatial_dims=2,
-        in_channels=1,
-        out_channels=3,
-        channels=(8, 16, 32, 64),
-        strides=(2, 2, 2),
-        num_res_units=2,
-        norm=Norm.BATCH,
-        dropout=0.3,
-    )
-
-    # Load the trained 2D U-Net model
-    model_state = torch.load("best_metric_model.pth", map_location=torch.device('cpu'))
-    model.load_state_dict(model_state)
-    model.eval()
-
     # Load the 3D NIFTI volume
     nifti_volume = nib.load(fname_in)
     volume = nifti_volume.get_fdata()
@@ -86,27 +68,56 @@ def main():
     dataset = Dataset(data_list, transform=transforms)
     dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
-    # Apply the model to each slice
-    segmented_slices = []
+    # Fetch all existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
+    path_models = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith('best_metric_model')]
+    # Load the trained 2D U-Net models
+    models = []
+    for path_model in path_models:
+        # Instantiate the 2D U-Net model with appropriate parameters
+        # You need to replace num_classes, channels, strides, and kernel_size with the values used in your trained model
+        model = UNet(
+            spatial_dims=2,
+            in_channels=1,
+            out_channels=3,
+            channels=(8, 16, 32, 64),
+            strides=(2, 2, 2),
+            num_res_units=2,
+            norm=Norm.BATCH,
+            dropout=0.3,
+        )
+        model_state = torch.load(path_model, map_location=torch.device('cpu'))
+        model.load_state_dict(model_state)
+        model.eval()
+        models.append(model)
+
+    # Define the post-processing transforms to apply to the model output
     post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
 
     with torch.no_grad():
-        for data in tqdm(dataloader, desc="Process image", unit="image"):
+        segmented_slices = []
+        for data in tqdm(dataloader, desc=f"Segment image", unit="image"):
             image = data["image"].to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
             # TODO: parametrize values below
             roi_size = (192, 192)
             sw_batch_size = 4
-            val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model)
-            # TODO: consider optimizing prediction function below, because:
-            #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
-            #  vs. ~45image/s with using output = model(image)
-            #  See old code at a4637c05588511f0ca9da2f298b1effeed8fe880
-            val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
-            if isinstance(val_outputs, list):
-                val_outputs = torch.stack(val_outputs)
-            segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
-            # print(segmented_slice.max())
-            segmented_slices.append(segmented_slice)
+            segmented_slice_ensemble_all = []
+            for model in models:
+                # Apply the model to each slice
+                val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model)
+                # TODO: consider optimizing prediction function below, because:
+                #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
+                #  vs. ~45image/s with using output = model(image)
+                #  See old code at a4637c05588511f0ca9da2f298b1effeed8fe880
+                val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
+                if isinstance(val_outputs, list):
+                    val_outputs = torch.stack(val_outputs)
+                segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
+                segmented_slice_ensemble_all.append(segmented_slice)
+
+            # average all predictions
+            # TODO: consider using other aggregation methods (eg: majority voting)
+            segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
+            segmented_slices.append(segmented_slice_ensemble)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
