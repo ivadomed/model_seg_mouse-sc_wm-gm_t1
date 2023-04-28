@@ -43,6 +43,7 @@ def main():
                                                  "dimension. The function assumes that the model state "
                                                  "'best_metric_model.pth' is present in the local directory")
     parser.add_argument("-i", "--input", type=str, required=True, help="NIfTI file to process.")
+    # TODO: add possibility to specify model state file(s)
     args = parser.parse_args()
     fname_in = args.input
 
@@ -92,6 +93,8 @@ def main():
         model.eval()
         models.append(model)
     print(f"Using models: {path_models}")
+    # TODO: make sure that all model states have different parameters (to avoid the situation where the same model has
+    #  been loaded twice)
 
     # Define the post-processing transforms to apply to the model output
     post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
