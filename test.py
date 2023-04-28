@@ -11,6 +11,7 @@ import argparse
 import numpy as np
 import nibabel as nib
 import os
+from scipy import stats
 import torch
 from tqdm import tqdm
 
@@ -66,6 +67,7 @@ def main():
 
     # Create the dataset and dataloader with the slices and transforms
     dataset = Dataset(data_list, transform=transforms)
+    # TODO: try with different num_workers
     dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
     # Fetch all existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
@@ -101,10 +103,11 @@ def main():
             # TODO: parametrize values below
             roi_size = (192, 192)
             sw_batch_size = 4
+            overlap = 0.25
             segmented_slice_ensemble_all = []
             for model in models:
                 # Apply the model to each slice
-                val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model)
+                val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model, overlap)
                 # TODO: consider optimizing prediction function below, because:
                 #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
                 #  vs. ~45image/s with using output = model(image)
@@ -115,10 +118,11 @@ def main():
                 segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
                 segmented_slice_ensemble_all.append(segmented_slice)
 
-            # average all predictions
-            # TODO: consider using other aggregation methods (eg: majority voting)
-            segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
-            segmented_slices.append(segmented_slice_ensemble)
+            # Aggregate the predictions from the different models
+            segmented_slice_ensemble_all = np.array(segmented_slice_ensemble_all)
+            segmented_slice_majority_voting = stats.mode(segmented_slice_ensemble_all, axis=0, keepdims=False).mode[0]
+            # segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
+            segmented_slices.append(segmented_slice_majority_voting)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -135,7 +139,7 @@ if __name__ == "__main__":
     main()
 
 
-# DEBUGGING CODE
+# # DEBUGGING CODE
 # import matplotlib.pyplot as plt
 # plt.figure("check", (12, 6))
 # plt.subplot(1, 2, 1)
