@@ -131,11 +131,16 @@ def main():
                 segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
                 segmented_slice_ensemble_all.append(segmented_slice)
 
-            # Aggregate the predictions from the different models
-            segmented_slice_ensemble_all = np.array(segmented_slice_ensemble_all)
-            segmented_slice_majority_voting = stats.mode(segmented_slice_ensemble_all, axis=0, keepdims=False).mode[0]
-            # segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
-            segmented_slices.append(segmented_slice_majority_voting)
+            # Do not aggregate the predictions from the different models if only one model is used
+            if len(models) == 1:
+                segmented_slice_ensemble_all = segmented_slice_ensemble_all[0]
+            else:
+                # Aggregate the predictions from the different models using majority voting
+                segmented_slice_ensemble_all = np.array(segmented_slice_ensemble_all)
+                segmented_slice_ensemble_all = stats.mode(segmented_slice_ensemble_all, axis=0, keepdims=False).mode[0]
+                # segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
+            # Add the segmented slice to the list of segmented slices
+            segmented_slices.append(segmented_slice_ensemble_all)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
