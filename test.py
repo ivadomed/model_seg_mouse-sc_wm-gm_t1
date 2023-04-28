@@ -43,7 +43,11 @@ def main():
                                                  "dimension. The function assumes that the model state "
                                                  "'best_metric_model.pth' is present in the local directory")
     parser.add_argument("-i", "--input", type=str, required=True, help="NIfTI file to process.")
-    # TODO: add possibility to specify model state file(s)
+    # add possibility to specify model state file(s). Multiple files can be listed.
+    parser.add_argument("-m", "--model", type=str, required=False, nargs='+',
+                        help="Model state file(s) to use. Multiple files can be listed (separate with space). If not "
+                             "specified, the function will use the file(s) 'best_metric_model*.pth' in the local "
+                             "directory.")
     args = parser.parse_args()
     fname_in = args.input
 
@@ -73,8 +77,11 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Fetch all existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
-    path_models = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith('best_metric_model')]
+    if args.model:
+        path_models = args.model
+    else:
+        # Fetch existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
+        path_models = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith('best_metric_model')]
     # Load the trained 2D U-Net models
     models = []
     for path_model in path_models:
