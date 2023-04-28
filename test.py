@@ -71,6 +71,8 @@ def main():
     # TODO: try with different num_workers
     dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Fetch all existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
     path_models = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith('best_metric_model')]
     # Load the trained 2D U-Net models
@@ -88,7 +90,7 @@ def main():
             norm=Norm.BATCH,
             dropout=0.3,
         )
-        model_state = torch.load(path_model, map_location=torch.device('cpu'))
+        model_state = torch.load(path_model, map_location=device)
         model.load_state_dict(model_state)
         model.eval()
         models.append(model)
@@ -102,7 +104,7 @@ def main():
     with torch.no_grad():
         segmented_slices = []
         for data in tqdm(dataloader, desc=f"Segment image", unit="image"):
-            image = data["image"].to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+            image = data["image"].to(device)
             # TODO: parametrize values below
             roi_size = (192, 192)
             sw_batch_size = 4
