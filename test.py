@@ -92,6 +92,7 @@ def main():
         )
         model_state = torch.load(path_model, map_location=device)
         model.load_state_dict(model_state)
+        model.to(device)
         model.eval()
         models.append(model)
     print(f"Using models: {path_models}")
