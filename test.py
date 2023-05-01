@@ -11,7 +11,6 @@ import argparse
 import numpy as np
 import nibabel as nib
 import os
-from scipy import stats
 import torch
 from tqdm import tqdm
 
@@ -33,6 +32,17 @@ def add_suffix_to_filename(filename, suffix):
 
     output_filename = f"{name}{suffix}{ext}"
     return output_filename
+
+
+def majority_voting(segmented_slice_ensemble_all):
+    """
+    Apply majority voting to the ensemble of segmented slices
+    :param segmented_slice_ensemble_all:
+    :return:
+    """
+    unique_elements, counts = np.unique(segmented_slice_ensemble_all, return_counts=True, axis=0)
+    max_index = np.argmax(counts)
+    return unique_elements[max_index]
 
 
 def main():
@@ -133,14 +143,14 @@ def main():
 
             # Do not aggregate the predictions from the different models if only one model is used
             if len(models) == 1:
-                segmented_slice_ensemble_all = segmented_slice_ensemble_all[0]
+                segmented_slice_ensemble_all_aggregated = segmented_slice_ensemble_all[0]
             else:
                 # Aggregate the predictions from the different models using majority voting
-                segmented_slice_ensemble_all = np.array(segmented_slice_ensemble_all)
-                segmented_slice_ensemble_all = stats.mode(segmented_slice_ensemble_all, axis=0, keepdims=False).mode[0]
-                # segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
+                segmented_slice_ensemble_all_aggregated = majority_voting(np.array(segmented_slice_ensemble_all))
+                # Alternative approach using mean:
+                #  segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
             # Add the segmented slice to the list of segmented slices
-            segmented_slices.append(segmented_slice_ensemble_all)
+            segmented_slices.append(segmented_slice_ensemble_all_aggregated)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
