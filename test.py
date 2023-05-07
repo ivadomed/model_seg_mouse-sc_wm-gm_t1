@@ -11,6 +11,7 @@ import argparse
 import numpy as np
 import nibabel as nib
 import os
+from scipy.ndimage import gaussian_filter1d
 import torch
 from tqdm import tqdm
 
@@ -32,6 +33,66 @@ def add_suffix_to_filename(filename, suffix):
 
     output_filename = f"{name}{suffix}{ext}"
     return output_filename
+
+
+def apply_gaussian_smoothing_filter(arr, dim, sigma=1):
+    """
+    Apply a Gaussian smoothing filter to a 3D numpy array along the specified dimension.
+
+    :param arr: A 3D numpy array.
+    :param dim: The dimension along which to apply the smoothing filter (0, 1, or 2).
+    :param sigma: The standard deviation of the Gaussian kernel (default is 1).
+    :return: The smoothed 3D numpy array.
+    """
+
+    if dim not in (0, 1, 2):
+        raise ValueError("Invalid dimension. Dimension should be 0, 1, or 2.")
+
+    # Move the axis specified by 'dim' to the last position
+    arr = np.moveaxis(arr, dim, -1)
+
+    # Apply the Gaussian smoothing filter
+    smoothed_arr = np.apply_along_axis(lambda x: gaussian_filter1d(x, sigma=sigma), -1, arr)
+
+    # Move the axis back to its original position
+    smoothed_arr = np.moveaxis(smoothed_arr, -1, dim)
+
+    return smoothed_arr
+
+
+def apply_smoothing_filter(arr, dim, window_size=3):
+    """
+    Apply a moving average smoothing filter to a 3D numpy array along the specified dimension.
+
+    :param arr: A 3D numpy array.
+    :param dim: The dimension along which to apply the smoothing filter (0, 1, or 2).
+    :param window_size: The size of the moving average window (default is 3).
+    :return: The smoothed 3D numpy array.
+    """
+
+    if dim not in (0, 1, 2):
+        raise ValueError("Invalid dimension. Dimension should be 0, 1, or 2.")
+
+    if window_size < 1 or window_size % 2 == 0:
+        raise ValueError("Invalid window size. Window size should be a positive odd integer.")
+
+    # Create the moving average kernel
+    kernel = np.ones(window_size) / window_size
+
+    # Move the axis specified by 'dim' to the last position
+    arr = np.moveaxis(arr, dim, -1)
+
+    # Pad the array to handle boundaries
+    pad_size = window_size // 2
+    padded_arr = np.pad(arr, [(0, 0)] * (arr.ndim - 1) + [(pad_size, pad_size)], mode='reflect')
+
+    # Apply the smoothing filter
+    smoothed_arr = np.apply_along_axis(lambda x: np.convolve(x, kernel, mode='valid'), -1, padded_arr)
+
+    # Move the axis back to its original position
+    smoothed_arr = np.moveaxis(smoothed_arr, -1, dim)
+
+    return smoothed_arr
 
 
 def majority_voting(segmented_slice_ensemble_all):
@@ -58,12 +119,33 @@ def main():
                         help="Model state file(s) to use. Multiple files can be listed (separate with space). If not "
                              "specified, the function will use the file(s) 'best_metric_model*.pth' in the local "
                              "directory.")
+    # add parameter to specify sigma for Gaussian smoothing filter
+    parser.add_argument("-s", "--sigma", type=float, required=False, default=2,
+                        help="Standard deviation of the Gaussian kernel for smoothing the input volume (default is 2)."
+                             "Try higher values (e.g. 2.5, 3) if the segmentation is too coarse, or lower values (1.5, "
+                             "1) if the segmentation is inaccurate, which could occur if adjacent slices look very "
+                             "different due to high curvature.")
     args = parser.parse_args()
     fname_in = args.input
 
     # Load the 3D NIFTI volume
     nifti_volume = nib.load(fname_in)
     volume = nifti_volume.get_fdata()
+
+    # Check that the input volume is oriented with the axial slice as the last (3rd) dimension
+    if volume.shape[2] < volume.shape[0] or volume.shape[2] < volume.shape[1]:
+        raise ValueError("The input volume is not oriented with the axial slice as the last (3rd) dimension.")
+
+    # Check that the input volume has the correct number of dimensions
+    if volume.ndim != 3:
+        raise ValueError("The input volume does not have the correct number of dimensions (3).")
+
+    # Apply a smoothing filter to the volume
+    print(f"Smoothing the input volume along Z with sigma: {args.sigma}...")
+    volume = apply_gaussian_smoothing_filter(volume, dim=2, sigma=args.sigma)
+    # Save volume as NIfTI for visualization
+    nifti_volume_smoothed = nib.Nifti1Image(volume, nifti_volume.affine, nifti_volume.header)
+    nib.save(nifti_volume_smoothed, add_suffix_to_filename(fname_in, "_smoothed"))
 
     # Create a list of dictionaries with the 2D slices
     data_list = [{"image": np.expand_dims(volume[..., i], axis=0)} for i in range(volume.shape[-1])]
