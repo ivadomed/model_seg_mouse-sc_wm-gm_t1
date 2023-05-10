@@ -120,10 +120,10 @@ def main():
                              "specified, the function will use the file(s) 'best_metric_model*.pth' in the local "
                              "directory.")
     # add parameter to specify sigma for Gaussian smoothing filter
-    parser.add_argument("-s", "--sigma", type=float, required=False, default=2,
-                        help="Standard deviation of the Gaussian kernel for smoothing the input volume (default is 2)."
-                             "Try higher values (e.g. 2.5, 3) if the segmentation is too coarse, or lower values (1.5, "
-                             "1) if the segmentation is inaccurate, which could occur if adjacent slices look very "
+    parser.add_argument("-s", "--sigma", type=float, required=False, default=1,
+                        help="Standard deviation of the Gaussian kernel for smoothing the input volume (default is 1)."
+                             "Try higher values (e.g. 2, 3) if the segmentation is too coarse, or lower values (0.5) "
+                             "if the segmentation is inaccurate, which could occur if adjacent slices look very "
                              "different due to high curvature.")
     # add optional argument in case user wants to save smoothed volume (write with default filename)
     parser.add_argument("-o", "--output-smooth", required=False, default=None, action='store_true',
