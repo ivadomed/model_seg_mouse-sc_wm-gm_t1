@@ -125,6 +125,10 @@ def main():
                              "Try higher values (e.g. 2.5, 3) if the segmentation is too coarse, or lower values (1.5, "
                              "1) if the segmentation is inaccurate, which could occur if adjacent slices look very "
                              "different due to high curvature.")
+    # add optional argument in case user wants to save smoothed volume (write with default filename)
+    parser.add_argument("-o", "--output-smooth", required=False, default=None, store=False,
+                        help="Output the smoothed volume (for debugging purpose).")
+
     args = parser.parse_args()
     fname_in = args.input
 
@@ -145,7 +149,9 @@ def main():
     volume = apply_gaussian_smoothing_filter(volume, dim=2, sigma=args.sigma)
     # Save volume as NIfTI for visualization
     nifti_volume_smoothed = nib.Nifti1Image(volume, nifti_volume.affine, nifti_volume.header)
-    nib.save(nifti_volume_smoothed, add_suffix_to_filename(fname_in, "_smoothed"))
+    if args.output_smooth is not None:
+        print(f"Saving smoothed volume to: {args.output_smooth}")
+        nib.save(nifti_volume_smoothed, add_suffix_to_filename(fname_in, "_smoothed"))
 
     # Create a list of dictionaries with the 2D slices
     data_list = [{"image": np.expand_dims(volume[..., i], axis=0)} for i in range(volume.shape[-1])]
