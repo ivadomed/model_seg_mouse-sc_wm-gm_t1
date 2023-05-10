@@ -126,7 +126,7 @@ def main():
                              "1) if the segmentation is inaccurate, which could occur if adjacent slices look very "
                              "different due to high curvature.")
     # add optional argument in case user wants to save smoothed volume (write with default filename)
-    parser.add_argument("-o", "--output-smooth", required=False, default=None, store=False,
+    parser.add_argument("-o", "--output-smooth", required=False, default=None, action='store_true',
                         help="Output the smoothed volume (for debugging purpose).")
 
     args = parser.parse_args()
