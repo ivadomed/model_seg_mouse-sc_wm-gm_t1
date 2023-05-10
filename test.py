@@ -149,9 +149,10 @@ def main():
     volume = apply_gaussian_smoothing_filter(volume, dim=2, sigma=args.sigma)
     # Save volume as NIfTI for visualization
     nifti_volume_smoothed = nib.Nifti1Image(volume, nifti_volume.affine, nifti_volume.header)
-    if args.output_smooth is not None:
-        print(f"Saving smoothed volume to: {args.output_smooth}")
-        nib.save(nifti_volume_smoothed, add_suffix_to_filename(fname_in, "_smoothed"))
+    if args.output_smooth:
+        fname_smooth = add_suffix_to_filename(fname_in, "_smoothed")
+        print(f"Saving smoothed volume to: {fname_smooth}")
+        nib.save(nifti_volume_smoothed, fname_smooth)
 
     # Create a list of dictionaries with the 2D slices
     data_list = [{"image": np.expand_dims(volume[..., i], axis=0)} for i in range(volume.shape[-1])]
