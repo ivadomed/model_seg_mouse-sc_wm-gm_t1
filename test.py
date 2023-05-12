@@ -210,6 +210,7 @@ def main():
 
     with torch.no_grad():
         segmented_slices = []
+        segmented_slices_std = []
         for data in tqdm(dataloader, desc=f"Segment image", unit="image"):
             image = data["image"].to(device)
             # TODO: parametrize values below
@@ -238,8 +239,12 @@ def main():
                 segmented_slice_ensemble_all_aggregated = majority_voting(np.array(segmented_slice_ensemble_all))
                 # Alternative approach using mean:
                 #  segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
+                # TODO: do it only if flag is set
+                segmented_slice_ensemble_std = np.std(segmented_slice_ensemble_all, axis=0)
             # Add the segmented slice to the list of segmented slices
             segmented_slices.append(segmented_slice_ensemble_all_aggregated)
+            # TODO: do it only if flag is set
+            segmented_slices_std.append(segmented_slice_ensemble_std)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -249,6 +254,19 @@ def main():
     fname_out = add_suffix_to_filename(fname_in, '_seg')
     segmented_nifti = nib.Nifti1Image(segmented_volume, nifti_volume.affine)
     nib.save(segmented_nifti, fname_out)
+
+    print(f"Done! Output file: {fname_out}")
+
+    # TODO: do it only if flag is set
+    # Stack the standard deviations of the segmented slices to create the segmented 3D volume
+    segmented_volume_std = np.stack(segmented_slices_std, axis=-1)
+    segmented_volume_std = segmented_volume_std.astype(np.float32)
+
+    # Save the standard deviations of the segmented slices as a NIFTI file
+    fname_out = add_suffix_to_filename(fname_in, '_seg_std')
+    segmented_nifti_std = nib.Nifti1Image(segmented_volume_std, nifti_volume.affine)
+    nib.save(segmented_nifti_std, fname_out)
+
     print(f"Done! Output file: {fname_out}")
 
 
