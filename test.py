@@ -130,7 +130,7 @@ def main():
                         help="Output the smoothed volume (for debugging purpose).")
     parser.add_argument("-u", "--uncertainty", required=False, default=None, action='store_true',
                         help="Output the standard deviation across model predictions (uncertainty). This flag is only"
-                             "valid if there is more than one model state file.")
+                             " valid if there is more than one model state file.")
 
     args = parser.parse_args()
     fname_in = args.input
