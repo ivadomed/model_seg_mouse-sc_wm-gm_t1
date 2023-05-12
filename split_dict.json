@@ -1,0 +1,14 @@
+{
+         "train": [
+             "sub-mouse1",
+             "sub-mouse2",
+             "sub-mouse3",
+             "sub-mouse4"
+         ],
+         "valid": [
+             "sub-mouse5"
+         ],
+         "test": [
+             "sub-mouse6"
+         ]
+     }
