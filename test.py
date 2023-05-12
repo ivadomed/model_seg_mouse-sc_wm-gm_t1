@@ -128,6 +128,9 @@ def main():
     # add optional argument in case user wants to save smoothed volume (write with default filename)
     parser.add_argument("-o", "--output-smooth", required=False, default=None, action='store_true',
                         help="Output the smoothed volume (for debugging purpose).")
+    parser.add_argument("-u", "--uncertainty", required=False, default=None, action='store_true',
+                        help="Output the standard deviation across model predictions (uncertainty). This flag is only"
+                             "valid if there is more than one model state file.")
 
     args = parser.parse_args()
     fname_in = args.input
@@ -143,6 +146,10 @@ def main():
     # Check that the input volume has the correct number of dimensions
     if volume.ndim != 3:
         raise ValueError("The input volume does not have the correct number of dimensions (3).")
+
+    # Check that if -u is specified, there is more than one model state file
+    if args.uncertainty and len(args.model) == 1:
+        raise ValueError("The -u flag is only valid if there is more than one model state file.")
 
     # Apply a smoothing filter to the volume
     print(f"Smoothing the input volume along Z with sigma: {args.sigma}...")
@@ -239,12 +246,12 @@ def main():
                 segmented_slice_ensemble_all_aggregated = majority_voting(np.array(segmented_slice_ensemble_all))
                 # Alternative approach using mean:
                 #  segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
-                # TODO: do it only if flag is set
-                segmented_slice_ensemble_std = np.std(segmented_slice_ensemble_all, axis=0)
+                if args.uncertainty:
+                    segmented_slice_ensemble_std = np.std(segmented_slice_ensemble_all, axis=0)
             # Add the segmented slice to the list of segmented slices
             segmented_slices.append(segmented_slice_ensemble_all_aggregated)
-            # TODO: do it only if flag is set
-            segmented_slices_std.append(segmented_slice_ensemble_std)
+            if args.uncertainty:
+                segmented_slices_std.append(segmented_slice_ensemble_std)
 
     # Stack the segmented slices to create the segmented 3D volume
     segmented_volume = np.stack(segmented_slices, axis=-1)
@@ -257,17 +264,17 @@ def main():
 
     print(f"Done! Output file: {fname_out}")
 
-    # TODO: do it only if flag is set
-    # Stack the standard deviations of the segmented slices to create the segmented 3D volume
-    segmented_volume_std = np.stack(segmented_slices_std, axis=-1)
-    segmented_volume_std = segmented_volume_std.astype(np.float32)
+    if args.uncertainty:
+        # Stack the standard deviations of the segmented slices to create the segmented 3D volume
+        segmented_volume_std = np.stack(segmented_slices_std, axis=-1)
+        segmented_volume_std = segmented_volume_std.astype(np.float32)
 
-    # Save the standard deviations of the segmented slices as a NIFTI file
-    fname_out = add_suffix_to_filename(fname_in, '_seg_std')
-    segmented_nifti_std = nib.Nifti1Image(segmented_volume_std, nifti_volume.affine)
-    nib.save(segmented_nifti_std, fname_out)
+        # Save the standard deviations of the segmented slices as a NIFTI file
+        fname_out = add_suffix_to_filename(fname_in, '_seg_std')
+        segmented_nifti_std = nib.Nifti1Image(segmented_volume_std, nifti_volume.affine)
+        nib.save(segmented_nifti_std, fname_out)
 
-    print(f"Done! Output file: {fname_out}")
+        print(f"Done! Output file: {fname_out}")
 
 
 if __name__ == "__main__":
