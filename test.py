@@ -148,6 +148,10 @@ def main():
     if volume.ndim != 3:
         raise ValueError("The input volume does not have the correct number of dimensions (3).")
 
+    # Check that if -u is specified, there is more than one model state file
+    if args.uncertainty and len(args.model) == 1:
+        raise ValueError("The -u flag is only valid if there is more than one model state file.")
+
     # Apply a smoothing filter to the volume
     print(f"Smoothing the input volume along Z with sigma: {args.sigma}...")
     volume = apply_gaussian_smoothing_filter(volume, dim=2, sigma=args.sigma)
