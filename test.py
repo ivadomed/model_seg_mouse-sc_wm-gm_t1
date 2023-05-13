@@ -219,7 +219,7 @@ def main():
     with torch.no_grad():
         segmented_slices = []
         segmented_slices_std = []
-        for data in tqdm(dataloader, desc=f"Segment image", unit="image"):
+        for index, data in enumerate(tqdm(dataloader, desc="Segment image", unit="image")):
             image = data["image"].to(device)
             # TODO: parametrize values below
             roi_size = (192, 192)
@@ -249,6 +249,10 @@ def main():
                 #  segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
                 if args.uncertainty:
                     segmented_slice_ensemble_std = np.std(segmented_slice_ensemble_all, axis=0)
+                    # Calculate the average across non-null values
+                    non_null_values = np.where(np.isnan(segmented_slice_ensemble_all), 0, segmented_slice_ensemble_all)
+                    prediction_std = np.mean(non_null_values)
+                    print(f"Slice #{index}, Prediction STD: {prediction_std}")
             # Add the segmented slice to the list of segmented slices
             segmented_slices.append(segmented_slice_ensemble_all_aggregated)
             if args.uncertainty:
