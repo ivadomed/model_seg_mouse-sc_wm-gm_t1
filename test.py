@@ -8,6 +8,7 @@ To launch:
 """
 
 import argparse
+import csv
 import numpy as np
 import nibabel as nib
 import os
@@ -219,6 +220,8 @@ def main():
     with torch.no_grad():
         segmented_slices = []
         segmented_slices_std = []
+        prediction_std_list = []
+
         for index, data in enumerate(tqdm(dataloader, desc="Segment image", unit="image")):
             image = data["image"].to(device)
             # TODO: parametrize values below
@@ -252,7 +255,8 @@ def main():
                     # Calculate the average across non-null values
                     non_null_values = np.where(np.isnan(segmented_slice_ensemble_all), 0, segmented_slice_ensemble_all)
                     prediction_std = np.mean(non_null_values)
-                    print(f"Slice #{index}, Prediction STD: {prediction_std}")
+                    # print(f"Slice #{index}, Prediction STD: {prediction_std}")
+                    prediction_std_list.append([index, prediction_std])
             # Add the segmented slice to the list of segmented slices
             segmented_slices.append(segmented_slice_ensemble_all_aggregated)
             if args.uncertainty:
@@ -280,6 +284,13 @@ def main():
         nib.save(segmented_nifti_std, fname_out)
 
         print(f"Done! Output file: {fname_out}")
+
+        # Write the data to the CSV file
+        output_file = 'prediction_std.csv'
+        with open(output_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Index', 'Prediction STD'])  # Write the header
+            writer.writerows(prediction_std_list)  # Write the data rows
 
 
 if __name__ == "__main__":
