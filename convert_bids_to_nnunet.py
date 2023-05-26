@@ -50,16 +50,6 @@ from collections import OrderedDict
 import nibabel as nib
 import numpy as np
 
-
-def binarize_label(subject_path, label_path):
-    label_npy = nib.load(label_path).get_fdata()
-    threshold = 1e-12
-    label_npy = np.where(label_npy > threshold, 1, 0)
-    ref = nib.load(subject_path)
-    label_bin = nib.Nifti1Image(label_npy, ref.affine, ref.header)
-    # overwrite the original label file with the binarized version
-    nib.save(label_bin, label_path)
-
 def label_encoding(subject_path, label_path, label_gm_path, label_wm_path, threshold=1e-12):
     #Encoding of the label images with background=0 , GM=1 and WM=2
     #We consider that GM and WM don't overlap (maybe need to change that ?)
@@ -90,6 +80,7 @@ parser.add_argument('--taskname', default='MSSpineLesion', type=str,
 parser.add_argument('--tasknumber', default=501,type=int, 
                     help='Specify the task number, has to be greater than 500 but less than 999. e.g 502')
 parser.add_argument('--split-dict', help='Specify the splits using ivadomed dict, expecting a json file.', required=True)
+#parser.add_argument('--multichannel', action='store_true', help='To use a multi-channel model. Contrasts will be concatenated along the channel dimension.')
 
 args = parser.parse_args()
 
@@ -278,20 +269,23 @@ if __name__ == '__main__':
     json_dict['release'] = "0.0"
 
     
-    # Because only using one modality 
-    json_dict['modality'] = {
+    # Because only using one modality  
+    ## was changed from 'modality' to 'channel_names'
+    json_dict['channel_names'] = {
             "0": "T1w",
         }
     
     # NOTE: 0 is always the background. Any class labels should start from 1.
     json_dict['labels'] = {
-        "0": "background",
-        "1": "GM",
-        "2": "WM"
+        "background" : "0",
+        "GM" : "1" ,
+        "WM" : "2",
     }
    
     json_dict['numTraining'] = scan_cnt_train
     json_dict['numTest'] = scan_cnt_test
+    #Newly required field in the json file with v2
+    json_dict["file_ending"] = ".nii.gz"
 
     json_dict['training'] = [{'image': str(train_labels[i]).replace("labelsTr", "imagesTr") , "label": train_labels[i] }
                                  for i in range(len(train_images))]
