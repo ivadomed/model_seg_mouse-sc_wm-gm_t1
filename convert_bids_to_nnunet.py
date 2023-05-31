@@ -1,43 +1,8 @@
-# This script specifically converts a BIDS dataset split into train/val/test to the MSD dataset format for 
-# training with nnUNet.
-# The dataset split can be obtained in two ways: (1) from `split_dict.json` in ivadomed (see NOTE below), or, 
-# (2) by creating a new split by running the `create_data_splits.py` file.
-# This split will be used for creating the train and test folders for nnUNet. 
-# 
-# This is a NOT a do-it-all script. It is expected that the user will modify the script to specify the contrast
-# suffixes and the label file names. The placeholders for user inputs are marked with "TODO" in the comments.
-#  
-# Usage: python convert_bids_to_nnunet.py --path-data /path/to/bids/dataset --path-out /path/to/output/directory
-#                --taskname tSCIZurichLesions --tasknumber 502 --split-dict /path/to/ivadomed-split/dictionary
-# 
-# Format of the split dictionary:
-# {
-#     "train": [
-#         "sub-zh63",
-#         "sub-zh16",
-#         "sub-zh81",
-#         "sub-zh42",
-#         "sub-zh49"
-#     ],
-#     "valid": [
-#         "sub-zh79",
-#         "sub-zh01"
-#     ],
-#     "test": [
-#         "sub-zh02",
-#         "sub-zh80"
-#     ]
-# }
+# This scripts was adapted from a script by the following authors : Julian McGinnis, Naga Karthik 
 #
-# NOTE: The ivadomed dataset split can be found in "split_datasets.joblib" in the output folder of the ivadomed training.
-# Use the following code snippet to load the joblib and save it as a json file to be used as input for this script:
-# import joblib
-# split_dict = joblib.load('/path/to/split_datasets.joblib')
-# with open('/path/to/split_dict.json', 'w') as fp:
-#     json.dump(split_dict, fp, indent=4) 
-# 
-# Authors: Julian McGinnis, Naga Karthik 
-
+# This script is specifically designed to the zurich_mouse dataset. It converts the dataset from a BIDS format to a nnU-Net format. 
+# This script is specific in that it takes all labeled data for training and validation. Because, very little labelled data is available, no labelled data is used for testing.
+# However the test folder is built and it will be used for inference
 
 import argparse
 import pathlib
@@ -46,6 +11,7 @@ import json
 import os
 import shutil
 from collections import OrderedDict
+from tqdm import tqdm
 
 import nibabel as nib
 import numpy as np
@@ -79,14 +45,17 @@ parser.add_argument('--taskname', default='MSSpineLesion', type=str,
                     help='Specify the task name - usually the anatomy to be segmented, e.g. Hippocampus',)
 parser.add_argument('--tasknumber', default=501,type=int, 
                     help='Specify the task number, has to be greater than 500 but less than 999. e.g 502')
-parser.add_argument('--split-dict', help='Specify the splits using ivadomed dict, expecting a json file.', required=True)
+
+#The following argument is useless because we take every labelled data in the dataset for training and validation
+#parser.add_argument('--split-dict', help='Specify the splits using ivadomed dict, expecting a json file.', required=True)
+#The following argument is useless
 #parser.add_argument('--multichannel', action='store_true', help='To use a multi-channel model. Contrasts will be concatenated along the channel dimension.')
 
 args = parser.parse_args()
 
 path_in_images = Path(args.path_data)
 path_in_labels = Path(os.path.join(args.path_data, 'derivatives', 'manual_masks'))
-path_out = Path(os.path.join(os.path.abspath(args.path_out), f'Task{args.tasknumber}_{args.taskname}'))
+path_out = Path(os.path.join(os.path.abspath(args.path_out), f'Dataset{args.tasknumber}_{args.taskname}'))
 
 # define paths for train and test folders 
 path_out_imagesTr = Path(os.path.join(path_out, 'imagesTr'))
@@ -98,11 +67,6 @@ path_out_labelsTs = Path(os.path.join(path_out, 'labelsTs'))
 train_images, train_labels = [], []
 test_images, test_labels = [], []
 
-# NOTE: if more than 1 contrast is to be used, then create train/test lists for each contrast. These additional
-# contrasts are assumed to be co-registered so a single label file will be used for all contrasts. Hence, no need 
-# to create separate lists for labels.
-# Example: train_images_t2w, test_images_t2w = [], []
-
 if __name__ == '__main__':
 
     # make the directories
@@ -113,6 +77,42 @@ if __name__ == '__main__':
     pathlib.Path(path_out_labelsTs).mkdir(parents=True, exist_ok=True)
 
     conversion_dict = {}
+    
+
+    #------------- EXTRACTION OF THE LABELED IMAGES NAMES--------------------------
+    GM_labelled_imgs = []
+    WM_labelled_imgs = []
+    
+    # We first extract all the label files' names
+    label_dirs = sorted(list(path_in_labels.glob('*/')))
+    label_dirs = [str(x) for x in label_dirs] 
+    label_dirs = [k for k in label_dirs if 'sub' in k]
+    label_dirs = [k for k in label_dirs if 'derivatives' in k]
+    label_dirs = [k for k in label_dirs if '.DS' not in k]
+    
+    for label_dir in label_dirs:
+        # glob the session directories
+        label_subdirs = sorted(list(Path(label_dir).glob('*/')))
+        label_subdirs = [k for k in label_subdirs if '.DS' not in str(k)]
+        label_subdirs = [k for k in label_subdirs if '.nii' not in str(k)]
+
+        for label_subdir in label_subdirs :
+            # find the corresponding image file
+            GM_label_files = sorted(list(label_subdir.rglob('*T1w_label-GM_mask.nii.gz')))
+            WM_label_files = sorted(list(label_subdir.rglob('*T1w_label-WM_mask.nii.gz')))
+            #Add the path to the list of labels
+            GM_labelled_imgs += [str(k) for k in GM_label_files]
+            WM_labelled_imgs += [str(k) for k in WM_label_files]
+    
+    #--------------- DISPACTH OF LABELLED IMAGES AND UNLABELED IMAGES ------------------- 
+    
+    #Initialise the number of scans in train and in test folder
+    scan_cnt_train, scan_cnt_test = 0, 0
+
+    valid_train_imgs = []
+    valid_test_imgs = []
+
+    #The image folders
     dirs = sorted(list(path_in_images.glob('*/')))
     dirs = [str(x) for x in dirs]
     
@@ -122,132 +122,85 @@ if __name__ == '__main__':
     dirs = [k for k in dirs if 'derivatives' not in k]
     dirs = [k for k in dirs if '.DS' not in k]
 
-
-    scan_cnt_train, scan_cnt_test = 0, 0
-
-    # load the dataset splits from ivadomed
-    with open(args.split_dict) as f:
-        splits = json.load(f)
-
-    valid_train_imgs = []
-    valid_test_imgs = []
-    # NOTE: nnUNet does not require a separate validation folder, cross-validation is done internally 
-    # from within the training set.
-    valid_train_imgs.append(splits["train"])
-    valid_train_imgs.append(splits["valid"])
-    valid_test_imgs.append(splits["test"])
-
-    # flatten the lists
-    valid_train_imgs =[item for sublist in valid_train_imgs for item in sublist] 
-    valid_test_imgs =[item for sublist in valid_test_imgs for item in sublist] 
-
-    # assert number of training set images is equivalent to ivadomed
-    for dir in dirs:  # iterate over subdirs
+    for dir in tqdm(dirs):  # iterate over subdirs
 
         # glob the session directories
         subdirs = sorted(list(Path(dir).glob('*')))
         subdirs = [k for k in subdirs if '.DS' not in str(k)]
-
+        
         for subdir in subdirs:
-            # TODO: Define the contrast to use here.
-            # Examples: acq-ax_T2w.nii.gz, acq-sag_T2w.nii.gz, T2w.nii.gz, T1w.nii.gz
-            # If you want to use only the sagittal image, use the following line:
-            # image_file = sorted(list(subdir.rglob('*acq-sag_T2w.nii.gz')))[0]
-
             # find the corresponding image file
             image_files = sorted(list(subdir.rglob('*T1w.nii.gz')))
-            
+
             #Identify common data path
             common = os.path.relpath(os.path.dirname(image_files[0]), args.path_data)
-            # find the corresponding segmentation file
-            label_path = os.path.join(path_in_labels, common)
-            label_files = sorted(list(Path(label_path).rglob('*label*.nii.gz')))
+
 
             for image_file in image_files:
-                subject_name = str(Path(image_file).name).split('_')[0]
-                chunk_nb = str(Path(image_file).name).split('_')[1]
-                
-                label_file = [k for k in label_files if subject_name in str(k)]
-                label_file = [k for k in label_files if chunk_nb in str(k)]
+                subject_chunk = str(Path(image_file).name).split('_')[0] + "_" + str(Path(image_file).name).split('_')[1]
+            
+                if (subject_chunk in str(GM_labelled_imgs)) and (subject_chunk in str(WM_labelled_imgs)): 
+                    #Here we consider that the file has to be labeled for both GM and WM
+                    GM_label_file = [k for k in GM_labelled_imgs if subject_chunk in k][0]
+                    WM_label_file = [k for k in WM_labelled_imgs if subject_chunk in k][0]
 
-                
-                
-                if any(subject_name in word for word in valid_train_imgs) or any(subject_name in word for word in valid_test_imgs):
+                    scan_cnt_train+= 1
+
+                    image_file_nnunet = os.path.join(path_out_imagesTr,f'{args.taskname}_{scan_cnt_train:03d}_0000.nii.gz')
+                    label_file_nnunet_GM = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}_01.nii.gz')
+                    label_file_nnunet_WM = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}_02.nii.gz')
+                    label_file_nnunet = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}.nii.gz')
                     
-                    #check if the label file is included for every chunk
-                    if(len(label_file)!=2):
-                        print("No segmentation mask for this subject's (" + str(subject_name) + ") chunk: " + str(chunk_nb))
-                    else:
-                        label_file_GM = [k for k in label_file if 'GM' in str(k)][0]
-                        label_file_WM = [k for k in label_file if 'WM' in str(k)][0]
-                        
-                        if any(subject_name in word for word in valid_train_imgs):
-
-
-
-                            scan_cnt_train+= 1
-                            # create the new file names according to nnUNet's convention
-                            # From nnUNet's documentation: 
-                            # "Imaging files must therefore follow the following naming convention: case_identifier_XXXX.nii.gz. Hereby, XXXX is the modality identifier.
-                            # Label files are saved as case_identifier.nii.gz". 
-                            # More information can be found here: https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/dataset_conversion.md
-
-                            image_file_nnunet = os.path.join(path_out_imagesTr,f'{args.taskname}_{scan_cnt_train:03d}_0000.nii.gz')
-                            label_file_nnunet_GM = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}_01.nii.gz')
-                            label_file_nnunet_WM = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}_02.nii.gz')
-                            label_file_nnunet = os.path.join(path_out_labelsTr,f'{args.taskname}_{scan_cnt_train:03d}.nii.gz')
-                            
-                            train_images.append(str(image_file_nnunet))
-                            train_labels.append(str(label_file_nnunet))
-                            
-                            # copy the files to new structure
-                            shutil.copyfile(image_file, image_file_nnunet)
-                            shutil.copyfile(label_file_GM, label_file_nnunet_GM)
-                            shutil.copyfile(label_file_WM, label_file_nnunet_WM)
-                            
-                            #Encoding GM and WM label into one file
-                            label_encoding(image_file_nnunet, label_file_nnunet, label_file_nnunet_GM, label_file_nnunet_WM)
-                            os.remove(label_file_nnunet_GM)
-                            os.remove(label_file_nnunet_WM)
-                            
-                            conversion_dict[str(os.path.abspath(image_file))] = image_file_nnunet
-                            conversion_dict[str(os.path.abspath(label_file_GM))] = label_file_nnunet
-                            conversion_dict[str(os.path.abspath(label_file_WM))] = label_file_nnunet
-                        
-                        else:
-                            
-                            # Repeat the above procedure for testing
-                            scan_cnt_test += 1
-                            # create the new convention names
-                            image_file_nnunet = os.path.join(path_out_imagesTs,f'{args.taskname}_{scan_cnt_test:03d}_0000.nii.gz')
-                            label_file_nnunet_GM = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}_01.nii.gz')
-                            label_file_nnunet_WM = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}_02.nii.gz')
-                            label_file_nnunet = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}.nii.gz')
-
-                            test_images.append(str(image_file_nnunet))
-                            test_labels.append(str(label_file_nnunet))
-
-                            # copy the files to new structure
-                            shutil.copyfile(image_file, image_file_nnunet)
-                            shutil.copyfile(label_file_GM, label_file_nnunet_GM)
-                            shutil.copyfile(label_file_WM, label_file_nnunet_WM)
-
-                            #Encoding GM and WM label into one file
-                            label_encoding(image_file_nnunet, label_file_nnunet, label_file_nnunet_GM, label_file_nnunet_WM)
-                            os.remove(label_file_nnunet_GM)
-                            os.remove(label_file_nnunet_WM)
-
-                            conversion_dict[str(os.path.abspath(image_file))] = image_file_nnunet
-                            conversion_dict[str(os.path.abspath(label_file_GM))] = label_file_nnunet
-                            conversion_dict[str(os.path.abspath(label_file_WM))] = label_file_nnunet
-
+                    train_images.append(str(image_file_nnunet))
+                    train_labels.append(str(label_file_nnunet))
+                    
+                    # copy the files to new structure
+                    shutil.copyfile(image_file, image_file_nnunet)
+                    shutil.copyfile(GM_label_file, label_file_nnunet_GM)
+                    shutil.copyfile(WM_label_file, label_file_nnunet_WM)
+                    
+                    #Encoding GM and WM label into one file
+                    label_encoding(image_file_nnunet, label_file_nnunet, label_file_nnunet_GM, label_file_nnunet_WM)
+                    os.remove(label_file_nnunet_GM)
+                    os.remove(label_file_nnunet_WM)
+                    
+                    conversion_dict[str(os.path.abspath(image_file))] = image_file_nnunet
+                    conversion_dict[str(os.path.abspath(GM_label_file))] = label_file_nnunet
+                    conversion_dict[str(os.path.abspath(WM_label_file))] = label_file_nnunet
+                
                 else:
-                    print("Skipping file, could not be located in the specified split.", image_file)
+                            
+                    # Repeat the above procedure for testing
+                    scan_cnt_test += 1
+                    # create the new convention names
+                    image_file_nnunet = os.path.join(path_out_imagesTs,f'{args.taskname}_{scan_cnt_test:03d}_0000.nii.gz')
+                    #label_file_nnunet_GM = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}_01.nii.gz')
+                    #label_file_nnunet_WM = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}_02.nii.gz')
+                    label_file_nnunet = os.path.join(path_out_labelsTs,f'{args.taskname}_{scan_cnt_test:03d}.nii.gz')
+
+                    test_images.append(str(image_file_nnunet))
+                    test_labels.append(str(label_file_nnunet))
+
+                    # copy the files to new structure
+                    shutil.copyfile(image_file, image_file_nnunet)
+                    #shutil.copyfile(label_file_GM, label_file_nnunet_GM)
+                    #shutil.copyfile(label_file_WM, label_file_nnunet_WM)
+
+                    #Encoding GM and WM label into one file
+                    #label_encoding(image_file_nnunet, label_file_nnunet, label_file_nnunet_GM, label_file_nnunet_WM)
+                    #os.remove(label_file_nnunet_GM)
+                    #os.remove(label_file_nnunet_WM)
+
+                    conversion_dict[str(os.path.abspath(image_file))] = image_file_nnunet
+                    #conversion_dict[str(os.path.abspath(label_file_GM))] = label_file_nnunet
+                    #conversion_dict[str(os.path.abspath(label_file_WM))] = label_file_nnunet
 
 
-    assert scan_cnt_train == len(valid_train_imgs), 'No. of train/val images does not correspond to ivadomed split dict.'
-    assert scan_cnt_test == len(valid_test_imgs), 'No. of test images does not correspond to ivadomed split dict.'
+    #Display of number of training and number of testing images
+    print("Number of images for training: " + str(scan_cnt_train))
+    print("Number of images for testing: " + str(scan_cnt_test))
 
+    #----------------- CREATION OF THE DICTIONNARY-----------------------------------
     # create dataset_description.json
     json_object = json.dumps(conversion_dict, indent=4)
     # write to dataset description
@@ -275,7 +228,7 @@ if __name__ == '__main__':
             "0": "T1w",
         }
     
-    # NOTE: 0 is always the background. Any class labels should start from 1.
+    # 0 is always the background. Any class labels should start from 1.
     json_dict['labels'] = {
         "background" : "0",
         "GM" : "1" ,
@@ -290,6 +243,8 @@ if __name__ == '__main__':
     json_dict['training'] = [{'image': str(train_labels[i]).replace("labelsTr", "imagesTr") , "label": train_labels[i] }
                                  for i in range(len(train_images))]
     # Note: See https://github.com/MIC-DKFZ/nnUNet/issues/407 for how this should be described
+
+    #Removed because useless in this case
     json_dict['test'] = [str(test_labels[i]).replace("labelsTs", "imagesTs") for i in range(len(test_images))]
 
     # create dataset_description.json
