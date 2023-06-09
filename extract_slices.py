@@ -59,7 +59,7 @@ if __name__ == '__main__':
             #access of the label
             path_label_folder = Path(os.path.join(path_in_labels, folder_name, 'anat'))
             label_path_GM = [ f.path for f in os.scandir(path_label_folder) if '.nii.gz' in f.path and file_name_split in f.path and 'GM' in f.path]
-            label_path_WM = [ f.path for f in os.scandir(path_label_folder) if '.nii.gz' in f.path and file_name_split in f.path and 'GM' in f.path]
+            label_path_WM = [ f.path for f in os.scandir(path_label_folder) if '.nii.gz' in f.path and file_name_split in f.path and 'WM' in f.path]
             #we check if there is a label
             if len(label_path_GM)!=0:
                 label_GM = load(label_path_GM[0])
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                 #Now we iterate over slices ##can be improved with np.where(sum(label_GM_slice) not 0)
                 for slice_i in range(nb_slices):
                     label_GM_slice = np.asarray(label_GM.dataobj)[:,:,slice_i]
-                    label_WM_slice = np.asarray(label_GM.dataobj)[:,:,slice_i]  
+                    label_WM_slice = np.asarray(label_WM.dataobj)[:,:,slice_i]  
                     
                     #we check which slices are annotated (not blank) 
                     if np.sum(label_GM_slice)!=0 or np.sum(label_WM_slice)!=0 :
