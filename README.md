@@ -66,8 +66,9 @@ You will get the configuration plan for all four configurations (2d, 3d_fullres,
 ## Train model
 
 To train the model, use the following command:
-
+~~~
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_train DATASET-ID CONFIG FOLD --npz
+~~~
 
 > Example for Dataset 101, on 2d config with 5 folds: CUDA_VISIBLE_DEVICES=2 nnUNetv2_train 101 2d 5 --npz
 
