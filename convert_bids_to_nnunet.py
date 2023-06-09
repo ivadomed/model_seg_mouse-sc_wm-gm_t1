@@ -137,7 +137,7 @@ if __name__ == '__main__':
 
 
             for image_file in image_files:
-                subject_chunk = str(Path(image_file).name).split('_')[0] + "_" + str(Path(image_file).name).split('_')[1]
+                subject_chunk = str(Path(image_file).name).split('_')[0] + "_" + str(Path(image_file).name).split('_')[1] + "_"
             
                 if (subject_chunk in str(GM_labelled_imgs)) and (subject_chunk in str(WM_labelled_imgs)): 
                     #Here we consider that the file has to be labeled for both GM and WM
