@@ -27,7 +27,7 @@ Download dataset (internal git-annex): `zurich-mouse`
 
 Define the following environment variables:
 ~~~
-PATH_DATA_ZURICH_MOUSE=/path/to/zurich-mouse
+export PATH_DATA_ZURICH_MOUSE="/path/to/zurich-mouse"
 ~~~
 
 Example of training using GPU #0 and wandb group called "awesome-model" (for live monitoring):
