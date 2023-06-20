@@ -45,6 +45,7 @@ parser.add_argument('--taskname', default='MSSpineLesion', type=str,
                     help='Specify the task name - usually the anatomy to be segmented, e.g. Hippocampus',)
 parser.add_argument('--tasknumber', default=501,type=int, 
                     help='Specify the task number, has to be greater than 500 but less than 999. e.g 502')
+parser.add_argument('--label-folder', help='Path to the label folders in derivatives', default='manual_masks', type=str)
 
 #The following argument is useless because we take every labelled data in the dataset for training and validation
 #parser.add_argument('--split-dict', help='Specify the splits using ivadomed dict, expecting a json file.', required=True)
@@ -54,7 +55,8 @@ parser.add_argument('--tasknumber', default=501,type=int,
 args = parser.parse_args()
 
 path_in_images = Path(args.path_data)
-path_in_labels = Path(os.path.join(args.path_data, 'derivatives', 'manual_masks'))
+label_folder = args.label_folder
+path_in_labels = Path(os.path.join(args.path_data, 'derivatives', label_folder))
 path_out = Path(os.path.join(os.path.abspath(args.path_out), f'Dataset{args.tasknumber}_{args.taskname}'))
 
 # define paths for train and test folders 
