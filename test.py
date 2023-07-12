@@ -39,6 +39,7 @@ def get_parser():
     parser.add_argument('--use-mirroring', action='store_true', default=False,
                         help='Use mirroring (test-time) augmentation for prediction. '
                         'NOTE: Inference takes a long time when this is enabled. Default: False')
+    #Removed the following as we always use the best_checkpoint.pth model (only one stored)
     # parser.add_argument('--use-best-checkpoint', action='store_true', default=False,
     #                     help='Use the best checkpoint (instead of the final checkpoint) for prediction. '
     #                     'NOTE: nnUNet by default uses the final checkpoint. Default: False')
@@ -142,11 +143,6 @@ def main():
     # uses all the folds available in the model folder by default
     folds_avail = [int(f.split('_')[-1]) for f in os.listdir(args.path_model) if f.startswith('fold_')]
 
-    # ---------------------------------------------------------------
-    # OPTION 1: Currently, pip install nnUNetv2 does not have the latest version of nnUNet's inference 
-    # which is defined in OPTION 2. Hence, this method
-    # ---------------------------------------------------------------
-
     print('Starting inference...')
     start = time.time()
     # directly call the predict function
@@ -168,49 +164,6 @@ def main():
         num_processes_segmentation_export=3
     )
     end = time.time()
-    
-    # ---------------------------------------------------------------
-    # OPTION 2
-    # ---------------------------------------------------------------
-
-    # instantiate the nnUNetPredictor
-    # predictor = nnUNetPredictor(
-    #     tile_step_size=0.5,
-    #     use_gaussian=True,
-    #     use_mirroring=True,
-    #     perform_everything_on_gpu=True if args.use_gpu else False,
-    #     device=torch.device('cuda', 0) if args.use_gpu else torch.device('cpu'),
-    #     verbose=False,
-    #     verbose_preprocessing=False,
-    #     allow_tqdm=True
-    # )
-    # print('Running inference on device: {}'.format(predictor.device))
-
-    # # initializes the network architecture, loads the checkpoint
-    # predictor.initialize_from_trained_model_folder(
-    #     join(args.path_model),
-    #     use_folds=(0, 1),   # 
-    #     checkpoint_name='checkpoint_final.pth',
-    # )
-    # print('Model loaded successfully. Fetching test data...')
-
-    # # variant 1: give input and output folders
-    # # adapted from: https://github.com/MIC-DKFZ/nnUNet/tree/master/nnunetv2/inference
-    # if args.path_data is not None:
-    #     predictor.predict_from_files(path_data_tmp, path_out,
-    #                                 save_probabilities=False, overwrite=False,
-    #                                 num_processes_preprocessing=2, num_processes_segmentation_export=2,
-    #                                 folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
-
-    # # variant 2, use list of files as inputs. Note the usage of nested lists
-    # if args.path_image is not None:
-    #     # get absolute path to the image
-    #     args.path_image = Path(args.path_image).absolute()
-
-    #     predictor.predict_from_list_of_files([[args.path_image]], args.path_out,
-    #                                          save_probabilities=False, overwrite=False,
-    #                                          num_processes_preprocessing=2, num_processes_segmentation_export=2,
-    #                                          folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
     print('Inference done.')
 
