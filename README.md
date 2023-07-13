@@ -116,29 +116,42 @@ nnUNet_results/DatasetDATASET-ID_TASK-NAME/nnUNetTrainer__nnUNetPlans__CONFIG/fo
 
 ## Run inference
 
-To run an inference and obtain a segmentation, there are two ways to do so.
+To run an inference and obtain a segmentation, there are two ways to do so. 
 
-### Method 1
+### Method 1 - Using your previous training
 
+Format the image data to the nnU-Net file structure. 
 Use a terminal command line:
 ~~~
-CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/nnUNet_raw/DatasetDATASET-ID_TASK-NAME/imagesTs -o /path/to/predictions -d DATASET_ID -c CONFIG --save_probabilities -chk checkpoint_best.pth -f FOLD
+CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/predictions -d DATASET_ID -c CONFIG --save_probabilities -chk checkpoint_best.pth -f FOLD
 ~~~
 
-You can now access the predictions in the folder `./path/to/predictions`. 
+You can now access the predictions in the folder `/path/to/predictions`. 
 
-### Method 2
+### Method 2 - Using our trained model on terminal 
 
+Format the image data to the nnU-Net file structure. 
+Download the `Dataset500_zurich_mouse.zip` from the release and unzip it in the `/nnUNet_results` folder. 
+Then run the terminal command linde:
+~~~
+CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/predictions -d 500 -c 3d_fullres --save_probabilities -chk checkpoint_best.pth -f 4
+~~~
+
+You can now access the predictions in the folder `/path/to/predictions`. 
+
+### Method 3 - Using our trained model with `test.py`
+
+Download the model `Dataset500_zurich_mouse.zip` from the release and unzip it. 
 Use the `test.py` function:
 
 To run on the whole dataset:
 ~~~
-python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/model
+python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
 
 To run on individual(s) NIfTI image(s):
 ~~~
-python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/model
+python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
 
 ## Apply post-processing
