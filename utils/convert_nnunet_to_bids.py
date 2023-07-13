@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser(description='Converts the 3D nnU-Net segmentati
 parser.add_argument('--path-conversion-dict', required=True, type = str, help='Path to the json conversion dicionnary to identify corresponding original image to each segmentation')
 parser.add_argument('--path-segmentation-folder', help='Path to the segmentation folder.', type =str, required=True),
 parser.add_argument('--path-dataset', help='Path to the dataset folder.', type =str, required=True),
-parser.add_argument('--mask_name', default='2d_nnUNet_masks', type=str, help='Name of the folder created at same location as `manual_masks` folder')
+parser.add_argument('--mask-name', default='2d_nnUNet_masks', type=str, help='Name of the folder created at same location as `manual_masks` folder')
 
 #Args assigned to variables
 args = parser.parse_args()
