@@ -1,3 +1,31 @@
+"""Inference of 3D nnU-Net model
+
+This python script runs inference of the 3D nnU-Net model on nifti images.  
+
+Example of run:
+
+    Method 1 (when running on whole dataset):
+        $ python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/model
+
+    Method 2 (when running on individual images):
+        $ python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/model 
+
+Arguments:
+
+    --path-dataset : Path to the test dataset folder. Use this argument only if you want predict on a whole dataset
+    --path-images : List of images to segment. Use this argument only if you want predict on a single image or list of invidiual images
+    --path-out : Path to output directory
+    --path-model : Path to the model directory. This folder should contain individual folders like fold_0, fold_1, etc.'
+    --use-gpu : Use GPU for inference. Default: False
+    --use-mirroring : Use mirroring (test-time) augmentation for prediction. NOTE: Inference takes a long time when this is enabled. Default: False
+    
+Todo:
+    * 
+
+Script inspired by script from Naga Karthik.
+Pierre-Louis Benveniste
+"""
+
 import os
 import argparse
 import torch
@@ -6,17 +34,6 @@ from batchgenerators.utilities.file_and_folder_operations import join
 import time
 
 from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
-# from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-
-
-"""
-Usage example:
-Method 1 (when running on whole dataset):
-    python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/model
-
-Method 2 (when running on individual images):
-    python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/model
-"""
 
 def get_parser():
     # parse command line arguments
@@ -31,6 +48,7 @@ def get_parser():
     parser.add_argument('--path-model', required=True, 
                         help='Path to the model directory. This folder should contain individual folders '
                         'like fold_0, fold_1, etc.',)
+    #Removed because in this case we only have one fold
     # parser.add_argument('--use-all-folds', action='store_true', default=False,
     #                     help='Specify the folds of the trained model that should be used for prediction. '
     #                          'Default: (0, 1, 2, 3, 4)')
