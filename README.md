@@ -34,9 +34,9 @@ In this project, we trained a 3D nnU-Net for spinal cord white and grey matter s
 
 In order to train a 3D nnU-Net, the following steps were completed: 
 - First, a total of 161 slices were labelled on various subjects. (ADD MANUAL LABELLING PROCEDURE)
-- The slices were then extracted using the [extract_slices.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/extract_slices.py) function: it extracted both the slice from the MRI image as well as the mask's slice. These were gathered into a temporary dataset, on which a 2D nnU-Net model was trained to segment spinal cord white and grey matter. The inference was then performed using this model on the full 3D volume from the original dataset. 
+- The slices were then extracted using the [extract_slices.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/utils/extract_slices.py) function: it extracted both the slice from the MRI image as well as the mask's slice. These were gathered into a temporary dataset, on which a 2D nnU-Net model was trained to segment spinal cord white and grey matter. The inference was then performed using this model on the full 3D volume from the original dataset. 
 - Then, a 3D nnU-Net was trained on the images from the zurich-mouse dataset (of shape (200x200x500)), using the results from the previous inference as ground truth as well as using extracted slices (of shape (200x200x1)) and their manual segmentation. The inference, was again performed on the full zurich-mouse dataset. Going from a 2D nnU-Net to a 3D nnU-Net helped improved the continuity of the segmentation of the z-axis. 
-- After that, we selected the best segmentation masks on the dataset totalling 31 images. For each of these images we noted that the top and bottom slices were often poorly annotated. Using the [crop_image_and_mask.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/crop_image_and_mask.py) script we removed these slices. The objective was to keep only qualitative annotations. 
+- After that, we selected the best segmentation masks on the dataset totalling 31 images. For each of these images we noted that the top and bottom slices were often poorly annotated. Using the [crop_image_and_mask.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/utils/crop_image_and_mask.py) script we removed these slices. The objective was to keep only qualitative annotations. 
 - Finally, a 3D nnU-Net was trained on these qualitative image segmentations (31 images) with various dimension as well as annotated slices (161 images). The nnU-Net was trained on 1000 epochs, with "3d_fullres" configuration and on 5 folds. The best Dice score were the following (fold 0 : 0.9135, fold 1: 0.9083, fold 2: 0.9109 , fold 3: 0.9132, fold 4: 0.9173). 
 
 For the packaging we decided to keep only fold 4 as it has the best dice score and all performed simimarly in terms of final results as well as training evolution (meaning that the dataset is rather homogeneous). The reason for this is to avoid having to upload the full results model which weight around 5GB and limit ourself to 250 MB. Also, inference is much longer when performed on 5 folds instead of 1 and results are comparable. 
@@ -55,26 +55,26 @@ mkdir nnUNet_results
 
 **To extract slices**
 
-In order to extract slices from the original file (dimension (500,500,200)) and their label, and to create a new file (dimesion (500,500,1)) in another dataset folder. To do so we use [extract_slices.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/extract_slices.py) in the following way:
+In order to extract slices from the original file (dimension (500,500,200)) and their label, and to create a new file (dimesion (500,500,1)) in another dataset folder. To do so we use [extract_slices.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/utils/extract_slices.py) in the following way:
 
 ~~~
-python extract_slices.py --path-data /path/to/data --path-out /path/to/project/folder
+python ./utils/extract_slices.py --path-data /path/to/data --path-out /path/to/project/folder
 ~~~
 
 **To crop images**
 
-To crop both images and their respective mask in order to remove certain slices, use the following script [crop_image_and_mask.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/crop_image_and_mask.py): 
+To crop both images and their respective mask in order to remove certain slices, use the following script [crop_image_and_mask.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/utils/crop_image_and_mask.py): 
 
 ~~~
-python crop_image_and_mask.py --folder-path /path/to/folder/  --file-name file_name.nii.gz --first-slice XXX --last-slice XXX
+python ./utils/crop_image_and_mask.py --folder-path /path/to/folder/  --file-name file_name.nii.gz --first-slice XXX --last-slice XXX
 ~~~
 
 **To convert from BIDS to nnU-Net format**
 
-Before using the nnU-Net model, we convert the dataset from the BIDS format to the nnU-Net fornat using [convert_bids_to_nnunet.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/convert_bids_to_nnunet.py). In this script, all the labeled data is used for training and the unlabeled-data is used for inference. 
+Before using the nnU-Net model, we convert the dataset from the BIDS format to the nnU-Net fornat using [convert_bids_to_nnunet.py](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/plb/nnunet/utils/convert_bids_to_nnunet.py). In this script, all the labeled data is used for training and the unlabeled-data is used for inference. 
 
 ~~~
-python convert_bids_to_nnunet.py --path-data /path/to/data_extracted --path-out /path/to/nnUNet_raw --taskname TASK-NAME --tasknumber DATASET-ID
+python ./utils/convert_bids_to_nnunet.py --path-data /path/to/data_extracted --path-out /path/to/nnUNet_raw --taskname TASK-NAME --tasknumber DATASET-ID
 ~~~
 
 This will output a dataset called `DatasetDATASET-ID_TASK-NAME` in the `/nnUNet_raw` folder. (DATASET-ID has to be between 100 and 999).
