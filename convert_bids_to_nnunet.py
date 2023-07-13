@@ -1,8 +1,26 @@
-# This scripts was adapted from a script by the following authors : Julian McGinnis, Naga Karthik 
-#
-# This script is specifically designed to the zurich_mouse dataset. It converts the dataset from a BIDS format to a nnU-Net format. 
-# This script is specific in that it takes all labeled data for training and validation. Because, very little labelled data is available, no labelled data is used for testing.
-# However the test folder is built and it will be used for inference
+"""Convert data from BIDS to nnU-Net format
+
+This scripts was adapted from a script by the following authors : Julian McGinnis, Naga Karthik 
+This python script converts data from the BIDS format to the nnU-Net format in order to be able to perform pre-processing, training and inference.
+This script is specifically designed to the zurich_mouse dataset. It converts the dataset from a BIDS format to a nnU-Net format. 
+This script is specific in that it takes all labeled data for training and validation. Because, very little labelled data is available, no labelled data is used for testing.
+
+Example of run:
+
+    $ python convert_bids_to_nnunet.py --path-data /path/to/data_extracted --path-out /path/to/nnUNet_raw --taskname TASK-NAME --tasknumber DATASET-ID
+
+Arguments:
+
+    --path-data : Path to BIDS structured dataset. Accepts both cross-sectional and longitudinal datasets
+    --path-out' : Specify the task name - usually the anatomy to be segmented, e.g. Hippocampus
+    --tasknumber : Specify the task number, has to be greater than 100 but less than 999
+    --label-folder : Path to the label folders in derivatives (default='manual_masks')
+    
+Todo:
+    * 
+
+Pierre-Louis Benveniste
+"""
 
 import argparse
 import pathlib
@@ -17,8 +35,23 @@ import nibabel as nib
 import numpy as np
 
 def label_encoding(subject_path, label_path, label_gm_path, label_wm_path, threshold=1e-12):
-    #Encoding of the label images with background=0 , GM=1 and WM=2
-    #We consider that GM and WM don't overlap (maybe need to change that ?)
+    """Label encoding function for GM and WM masks.
+
+    It encodes the label images with background=0, GM=1 and WM=2. 
+    The files are then saved at the appropriate path. 
+    We consider that GM and WM don't overlap.
+
+    Args:
+        subject_path: The path to the subject mri image output file.
+        label_path: The path to the subject mri label output file.
+        label_gm_path: The path to the GM mri label input file.
+        label_wm_path: The path to the WM mri label input file.
+        threshold: The threshold below which a voxel is considered as unlabelled.
+
+    Returns:
+        Nothing. It however
+
+    """
 
     #For grey matter
     label_gm_npy = nib.load(label_gm_path).get_fdata() 
@@ -47,11 +80,6 @@ parser.add_argument('--tasknumber', default=501,type=int,
                     help='Specify the task number, has to be greater than 500 but less than 999. e.g 502')
 parser.add_argument('--label-folder', help='Path to the label folders in derivatives', default='manual_masks', type=str)
 
-#The following argument is useless because we take every labelled data in the dataset for training and validation
-#parser.add_argument('--split-dict', help='Specify the splits using ivadomed dict, expecting a json file.', required=True)
-#The following argument is useless
-#parser.add_argument('--multichannel', action='store_true', help='To use a multi-channel model. Contrasts will be concatenated along the channel dimension.')
-
 args = parser.parse_args()
 
 path_in_images = Path(args.path_data)
@@ -59,13 +87,13 @@ label_folder = args.label_folder
 path_in_labels = Path(os.path.join(args.path_data, 'derivatives', label_folder))
 path_out = Path(os.path.join(os.path.abspath(args.path_out), f'Dataset{args.tasknumber}_{args.taskname}'))
 
-# define paths for train and test folders 
+#Define paths for train and test folders 
 path_out_imagesTr = Path(os.path.join(path_out, 'imagesTr'))
 path_out_imagesTs = Path(os.path.join(path_out, 'imagesTs'))
 path_out_labelsTr = Path(os.path.join(path_out, 'labelsTr'))
 path_out_labelsTs = Path(os.path.join(path_out, 'labelsTs'))
 
-# we load both train and validation set into the train images as nnunet uses cross-fold-validation
+#We load both train and validation set into the train images as nnunet uses cross-fold-validation
 train_images, train_labels = [], []
 test_images, test_labels = [], []
 
@@ -80,7 +108,6 @@ if __name__ == '__main__':
 
     conversion_dict = {}
     
-
     #------------- EXTRACTION OF THE LABELED IMAGES NAMES--------------------------
     GM_labelled_imgs = []
     WM_labelled_imgs = []
@@ -185,17 +212,9 @@ if __name__ == '__main__':
 
                     # copy the files to new structure
                     shutil.copyfile(image_file, image_file_nnunet)
-                    #shutil.copyfile(label_file_GM, label_file_nnunet_GM)
-                    #shutil.copyfile(label_file_WM, label_file_nnunet_WM)
-
-                    #Encoding GM and WM label into one file
-                    #label_encoding(image_file_nnunet, label_file_nnunet, label_file_nnunet_GM, label_file_nnunet_WM)
-                    #os.remove(label_file_nnunet_GM)
-                    #os.remove(label_file_nnunet_WM)
-
+                    
                     conversion_dict[str(os.path.abspath(image_file))] = image_file_nnunet
-                    #conversion_dict[str(os.path.abspath(label_file_GM))] = label_file_nnunet
-                    #conversion_dict[str(os.path.abspath(label_file_WM))] = label_file_nnunet
+                    
 
 
     #Display of number of training and number of testing images
