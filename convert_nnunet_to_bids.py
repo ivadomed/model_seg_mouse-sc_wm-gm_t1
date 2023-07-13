@@ -1,12 +1,23 @@
-"""
-This code performs conversion from nnU-Net format to the BIDS format. 
-To use:
+"""Convert data from nnU-Net format to BIDS
 
-python convert_nnunet_to_bids.py --path-conversion-dict /PATH/TO/DICT --path-segmentation-folder /PATH/SEG --path-dataset /PATH/DATASET --mask_name NAME
+This python script converts data from the nnU-Net format to the BIDS format.
+
+Example of run:
+
+    $ python convert_nnunet_to_bids.py --path-conversion-dict /PATH/TO/DICT --path-segmentation-folder /PATH/SEG --path-dataset /PATH/DATASET --mask_name NAME
+
+Arguments:
+
+    --path-conversion-dict :  Path to the json conversion dicionnary to identify corresponding original image to each segmentation.
+    --path-segmentation-folder : Path to the segmentation folder.
+    --path-dataset : Path to the dataset folder.
+    --mask_name : Name of the folder created at same location as `manual_masks` folder (default: 2d_nnUNet_maks)
+    
+Todo:
+    * 
 
 Pierre-Louis Benveniste
 """
-
 
 import nibabel as nib
 import matplotlib.pyplot as plt
