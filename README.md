@@ -79,7 +79,17 @@ python ./utils/convert_bids_to_nnunet.py --path-data /path/to/data_extracted --p
 This will output a dataset called `DatasetDATASET-ID_TASK-NAME` in the `/nnUNet_raw` folder. (DATASET-ID has to be between 100 and 999).
 
 > **Note**
-> In the `convert_bids_to_nnunet` script, all the labeled data is used for training and the unlabeled-data is used for inference. 
+> In the `convert_bids_to_nnunet` script, all the labeled data is used for training and the unlabeled-data is used for inference.
+
+### Convert from nnU-Net file structure to BIDS
+
+After using an nnU-Net, if you want to convert back to the BIDS format, run:
+
+~~~
+python ./utils/convert_nnunet_to_bids.py --path-conversion-dict /PATH/TO/DICT --path-segmentation-folder /PATH/SEG --path-dataset /PATH/DATASET --mask-name MASK_NAME
+~~~
+
+This will output a dataset add a segmentation `mask_name` in the dataset derivatives.
 
 ## Data preprocessing
 
