@@ -1,292 +1,200 @@
+"""Inference of 3D nnU-Net model
+
+This python script runs inference of the 3D nnU-Net model on nifti images.  
+
+Example of run:
+
+    Method 1 (when running on whole dataset):
+        $ python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/model
+
+    Method 2 (when running on individual images):
+        $ python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/model 
+
+Arguments:
+
+    --path-dataset : Path to the test dataset folder. Use this argument only if you want predict on a whole dataset
+    --path-images : List of images to segment. Use this argument only if you want predict on a single image or list of invidiual images
+    --path-out : Path to output directory
+    --path-model : Path to the model directory. This folder should contain individual folders like fold_0, fold_1, etc.'
+    --use-gpu : Use GPU for inference. Default: False
+    --use-mirroring : Use mirroring (test-time) augmentation for prediction. NOTE: Inference takes a long time when this is enabled. Default: False
+    
+Todo:
+    * 
+
+Script inspired by script from Naga Karthik.
+Pierre-Louis Benveniste
 """
-Spinal cord white and gray matter segmentation (2 classes) using 2D kernel based on MONAI, with WandB monitoring.
-It assumes the file(s) "best_metric_model*.pth" is locally present.
-To launch:
 
-    python segment.py -i IMAGE
-
-"""
-
-import argparse
-import numpy as np
-import nibabel as nib
 import os
-from scipy.ndimage import gaussian_filter1d
+import argparse
 import torch
-from tqdm import tqdm
+from pathlib import Path
+from batchgenerators.utilities.file_and_folder_operations import join
+import time
 
-from monai.transforms import Activations, Compose, EnsureChannelFirstd, AsDiscrete, CastToTyped, \
-    ScaleIntensityRangePercentilesd
-from monai.data import Dataset, DataLoader, decollate_batch
-from monai.networks.nets import UNet
-from monai.networks.layers import Norm
-from monai.inferers import sliding_window_inference
+from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
 
 
-def add_suffix_to_filename(filename, suffix):
-    name, ext = os.path.splitext(filename)
+def get_parser():
+    # parse command line arguments
+    parser = argparse.ArgumentParser(description='Segment images using nnUNet')
+    parser.add_argument('--path-dataset', default=None, type=str,
+                        help='Path to the test dataset folder. Use this argument only if you want '
+                        'predict on a whole dataset.')
+    parser.add_argument('--path-images', default=None, nargs='+', type=str,
+                        help='List of images to segment. Use this argument only if you want '
+                        'predict on a single image or list of invidiual images.')
+    parser.add_argument('--path-out', help='Path to output directory.', required=True)
+    parser.add_argument('--path-model', required=True, 
+                        help='Path to the model directory. This folder should contain individual folders '
+                        'like fold_0, fold_1, etc.',)
+    #Removed because in this case we only have one fold
+    # parser.add_argument('--use-all-folds', action='store_true', default=False,
+    #                     help='Specify the folds of the trained model that should be used for prediction. '
+    #                          'Default: (0, 1, 2, 3, 4)')
+    parser.add_argument('--use-gpu', action='store_true', default=False,
+                        help='Use GPU for inference. Default: False')
+    parser.add_argument('--use-mirroring', action='store_true', default=False,
+                        help='Use mirroring (test-time) augmentation for prediction. '
+                        'NOTE: Inference takes a long time when this is enabled. Default: False')
+    #Removed the following as we always use the best_checkpoint.pth model (only one stored)
+    # parser.add_argument('--use-best-checkpoint', action='store_true', default=False,
+    #                     help='Use the best checkpoint (instead of the final checkpoint) for prediction. '
+    #                     'NOTE: nnUNet by default uses the final checkpoint. Default: False')
 
-    # Check if there is a double extension
-    if ext.lower() in {'.gz', '.bz2', '.xz'}:
-        name, ext2 = os.path.splitext(name)
-        ext = ext2 + ext
-
-    output_filename = f"{name}{suffix}{ext}"
-    return output_filename
+    return parser
 
 
-def apply_gaussian_smoothing_filter(arr, dim, sigma=1):
+def splitext(fname):
+        """
+        Split a fname (folder/file + ext) into a folder/file and extension.
+
+        Note: for .nii.gz the extension is understandably .nii.gz, not .gz
+        (``os.path.splitext()`` would want to do the latter, hence the special case).
+        Taken (shamelessly) from: https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
+        """
+        dir, filename = os.path.split(fname)
+        for special_ext in ['.nii.gz', '.tar.gz']:
+            if filename.endswith(special_ext):
+                stem, ext = filename[:-len(special_ext)], special_ext
+                return os.path.join(dir, stem), ext
+        # If no special case, behaves like the regular splitext
+        stem, ext = os.path.splitext(filename)
+        return os.path.join(dir, stem), ext
+
+
+def add_suffix(fname, suffix):
     """
-    Apply a Gaussian smoothing filter to a 3D numpy array along the specified dimension.
+    Add suffix between end of file name and extension. Taken (shamelessly) from:
+    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
 
-    :param arr: A 3D numpy array.
-    :param dim: The dimension along which to apply the smoothing filter (0, 1, or 2).
-    :param sigma: The standard deviation of the Gaussian kernel (default is 1).
-    :return: The smoothed 3D numpy array.
+    :param fname: absolute or relative file name. Example: t2.nii.gz
+    :param suffix: suffix. Example: _mean
+    :return: file name with suffix. Example: t2_mean.nii
+
+    Examples:
+
+    - add_suffix(t2.nii, _mean) -> t2_mean.nii
+    - add_suffix(t2.nii.gz, a) -> t2a.nii.gz
     """
-
-    if dim not in (0, 1, 2):
-        raise ValueError("Invalid dimension. Dimension should be 0, 1, or 2.")
-
-    # Move the axis specified by 'dim' to the last position
-    arr = np.moveaxis(arr, dim, -1)
-
-    # Apply the Gaussian smoothing filter
-    smoothed_arr = np.apply_along_axis(lambda x: gaussian_filter1d(x, sigma=sigma), -1, arr)
-
-    # Move the axis back to its original position
-    smoothed_arr = np.moveaxis(smoothed_arr, -1, dim)
-
-    return smoothed_arr
+    stem, ext = splitext(fname)
+    return os.path.join(stem + suffix + ext)
 
 
-def apply_smoothing_filter(arr, dim, window_size=3):
-    """
-    Apply a moving average smoothing filter to a 3D numpy array along the specified dimension.
+def convert_filenames_to_nnunet_format(path_dataset):
 
-    :param arr: A 3D numpy array.
-    :param dim: The dimension along which to apply the smoothing filter (0, 1, or 2).
-    :param window_size: The size of the moving average window (default is 3).
-    :return: The smoothed 3D numpy array.
-    """
+    # create a temporary folder at the same level as the test folder
+    path_tmp = os.path.join(os.path.dirname(path_dataset), 'tmp')
+    if not os.path.exists(path_tmp):
+        os.makedirs(path_tmp, exist_ok=True)
 
-    if dim not in (0, 1, 2):
-        raise ValueError("Invalid dimension. Dimension should be 0, 1, or 2.")
+    for f in os.listdir(path_dataset):
+        if f.endswith('.nii.gz'):
+            # get absolute path to the image
+            f = os.path.join(path_dataset, f)
+            # add suffix
+            f_new = add_suffix(f, '_0000')
+            # copy to tmp folder
+            os.system('cp {} {}'.format(f, os.path.join(path_tmp, os.path.basename(f_new))))
 
-    if window_size < 1 or window_size % 2 == 0:
-        raise ValueError("Invalid window size. Window size should be a positive odd integer.")
-
-    # Create the moving average kernel
-    kernel = np.ones(window_size) / window_size
-
-    # Move the axis specified by 'dim' to the last position
-    arr = np.moveaxis(arr, dim, -1)
-
-    # Pad the array to handle boundaries
-    pad_size = window_size // 2
-    padded_arr = np.pad(arr, [(0, 0)] * (arr.ndim - 1) + [(pad_size, pad_size)], mode='reflect')
-
-    # Apply the smoothing filter
-    smoothed_arr = np.apply_along_axis(lambda x: np.convolve(x, kernel, mode='valid'), -1, padded_arr)
-
-    # Move the axis back to its original position
-    smoothed_arr = np.moveaxis(smoothed_arr, -1, dim)
-
-    return smoothed_arr
-
-
-def majority_voting(segmented_slice_ensemble_all):
-    """
-    Apply majority voting to the ensemble of segmented slices
-    :param segmented_slice_ensemble_all:
-    :return:
-    """
-    unique_elements, counts = np.unique(segmented_slice_ensemble_all, return_counts=True, axis=0)
-    max_index = np.argmax(counts)
-    return unique_elements[max_index]
+    return path_tmp
 
 
 def main():
-    # Get CLI argument
-    parser = argparse.ArgumentParser(description="Segment spinal cord white and gray matter. The function outputs a "
-                                                 "single NIfTI file with the 2 classes (WM: 1, GM: 2). The input file "
-                                                 "needs to be oriented with the axial slice as the last (3rd) "
-                                                 "dimension. The function assumes that the model state "
-                                                 "'best_metric_model.pth' is present in the local directory")
-    parser.add_argument("-i", "--input", type=str, required=True, help="NIfTI file to process.")
-    # add possibility to specify model state file(s). Multiple files can be listed.
-    parser.add_argument("-m", "--model", type=str, required=False, nargs='+',
-                        help="Model state file(s) to use. Multiple files can be listed (separate with space). If not "
-                             "specified, the function will use the file(s) 'best_metric_model*.pth' in the local "
-                             "directory.")
-    # add parameter to specify sigma for Gaussian smoothing filter
-    parser.add_argument("-s", "--sigma", type=float, required=False, default=1,
-                        help="Standard deviation of the Gaussian kernel for smoothing the input volume (default is 1)."
-                             "Try higher values (e.g. 2, 3) if the segmentation is too coarse, or lower values (0.5) "
-                             "if the segmentation is inaccurate, which could occur if adjacent slices look very "
-                             "different due to high curvature.")
-    # add optional argument in case user wants to save smoothed volume (write with default filename)
-    parser.add_argument("-o", "--output-smooth", required=False, default=None, action='store_true',
-                        help="Output the smoothed volume (for debugging purpose).")
-    parser.add_argument("-u", "--uncertainty", required=False, default=None, action='store_true',
-                        help="Output the standard deviation across model predictions (uncertainty). This flag is only"
-                             " valid if there is more than one model state file.")
 
+    parser = get_parser()
     args = parser.parse_args()
-    fname_in = args.input
 
-    # Load the 3D NIFTI volume
-    nifti_volume = nib.load(fname_in)
-    volume = nifti_volume.get_fdata()
+    if not os.path.exists(args.path_out):
+        os.makedirs(args.path_out, exist_ok=True)
 
-    # Check that the input volume is oriented with the axial slice as the last (3rd) dimension
-    if volume.shape[2] < volume.shape[0] or volume.shape[2] < volume.shape[1]:
-        raise ValueError("The input volume is not oriented with the axial slice as the last (3rd) dimension.")
+    if args.path_dataset is not None and args.path_images is not None:
+        raise ValueError('You can only specify either --path-dataset or --path-images (not both). See --help for more info.')
+    
+    if args.path_dataset is not None:
+        print('Found a dataset folder. Running inference on the whole dataset...')
 
-    # Check that the input volume has the correct number of dimensions
-    if volume.ndim != 3:
-        raise ValueError("The input volume does not have the correct number of dimensions (3).")
+        # NOTE: nnUNet only wants the _0000 suffix for files contained in a folder (i.e. when inference is run on a whole dataset)
+        # hence, we create a temporary folder with the proper filenames and delete it after inference is done
+        # More info about that naming convention here: 
+        # https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/dataset_format_inference.md
+        
+        print('Creating temporary folder with proper filenames...')
+        path_data_tmp = convert_filenames_to_nnunet_format(args.path_dataset)
+        path_out = args.path_out
 
-    # Check that if -u is specified, there is more than one model state file
-    if args.uncertainty and len(args.model) == 1:
-        raise ValueError("The -u flag is only valid if there is more than one model state file.")
+    elif args.path_images is not None:
+        # NOTE: for individual images, the _0000 suffix is not needed. BUT, the images should be in a list of lists
+        # get list of images from input argument
+        print(f'Found {len(args.path_images)} images. Running inference on them...')
+        # path_data_tmp = [[os.path.basename(f)] for f in args.path_images]
+        path_data_tmp = [[f] for f in args.path_images]
+        print(path_data_tmp)
 
-    # Apply a smoothing filter to the volume
-    print(f"Smoothing the input volume along Z with sigma: {args.sigma}...")
-    volume = apply_gaussian_smoothing_filter(volume, dim=2, sigma=args.sigma)
-    # Save volume as NIfTI for visualization
-    nifti_volume_smoothed = nib.Nifti1Image(volume, nifti_volume.affine, nifti_volume.header)
-    if args.output_smooth:
-        fname_smooth = add_suffix_to_filename(fname_in, "_smoothed")
-        print(f"Saving smoothed volume to: {fname_smooth}")
-        nib.save(nifti_volume_smoothed, fname_smooth)
+        path_out = args.path_out
+        # # add suffix '_pred' to predicted images
+        # for f in args.path_images:
+        #     path_pred = os.path.join(args.path_out, add_suffix(f, '_pred')) 
+        #     path_out.append(path_pred)
 
-    # Create a list of dictionaries with the 2D slices
-    data_list = [{"image": np.expand_dims(volume[..., i], axis=0)} for i in range(volume.shape[-1])]
+    # uses all the folds available in the model folder by default
+    folds_avail = [int(f.split('_')[-1]) for f in os.listdir(args.path_model) if f.startswith('fold_')]
 
-    # Prepare the keys for the dictionary used by MONAI transforms
-    keys = ["image"]
-
-    # Define the transforms to apply to the slices
-    transforms = Compose(
-        [
-            EnsureChannelFirstd(keys, channel_dim=0),
-            ScaleIntensityRangePercentilesd(keys, lower=5, upper=95, b_min=0.0, b_max=1.0, clip=True, relative=False),
-            CastToTyped(keys, dtype=torch.float32),
-        ]
+    print('Starting inference...')
+    start = time.time()
+    # directly call the predict function
+    predictor(
+        list_of_lists_or_source_folder=path_data_tmp, 
+        output_folder=path_out,
+        model_training_output_dir=args.path_model,
+        use_folds=folds_avail,
+        tile_step_size=0.5,
+        use_gaussian=True,                                      # applies gaussian noise and gaussian blur
+        use_mirroring=True if args.use_mirroring else False,    # test time augmentation by mirroring on all axes
+        perform_everything_on_gpu=True if args.use_gpu else False,
+        device=torch.device('cuda', 0) if args.use_gpu else torch.device('cpu'),
+        verbose=False,
+        save_probabilities=False,
+        overwrite=True,
+        checkpoint_name='checkpoint_best.pth',
+        num_processes_preprocessing=3,
+        num_processes_segmentation_export=3
     )
+    end = time.time()
 
-    # Create the dataset and dataloader with the slices and transforms
-    dataset = Dataset(data_list, transform=transforms)
-    # TODO: try with different num_workers
-    dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
+    print('Inference done.')
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print('Deleting the temporary folder...')
+    # delete the temporary folder
+    os.system('rm -rf {}'.format(path_data_tmp))
 
-    if args.model:
-        path_models = args.model
-    else:
-        # Fetch existing models in the current directory. The models are assumed to be named "best_metric_model*.pth"
-        path_models = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith('best_metric_model')]
-    # Load the trained 2D U-Net models
-    models = []
-    for path_model in path_models:
-        # Instantiate the 2D U-Net model with appropriate parameters
-        # You need to replace num_classes, channels, strides, and kernel_size with the values used in your trained model
-        model = UNet(
-            spatial_dims=2,
-            in_channels=1,
-            out_channels=3,
-            channels=(8, 16, 32, 64),
-            strides=(2, 2, 2),
-            num_res_units=2,
-            norm=Norm.BATCH,
-            dropout=0.3,
-        )
-        model_state = torch.load(path_model, map_location=device)
-        model.load_state_dict(model_state)
-        model.to(device)
-        model.eval()
-        models.append(model)
-    print(f"Using models: {path_models}")
-    # TODO: make sure that all model states have different parameters (to avoid the situation where the same model has
-    #  been loaded twice)
+    print('----------------------------------------------------')
+    print('Results can be found in: {}'.format(args.path_out))
+    print('----------------------------------------------------')
 
-    # Define the post-processing transforms to apply to the model output
-    post_pred = Compose([Activations(softmax=True), AsDiscrete(argmax=True, to_onehot=3)])
-
-    with torch.no_grad():
-        segmented_slices = []
-        segmented_slices_std = []
-        for data in tqdm(dataloader, desc=f"Segment image", unit="image"):
-            image = data["image"].to(device)
-            # TODO: parametrize values below
-            roi_size = (192, 192)
-            sw_batch_size = 4
-            overlap = 0.25
-            segmented_slice_ensemble_all = []
-            for model in models:
-                # Apply the model to each slice
-                val_outputs = sliding_window_inference(image, roi_size, sw_batch_size, model, overlap)
-                # TODO: consider optimizing prediction function below, because:
-                #  Processing images:  85%|████████████████████████████████▉      | 423/500 [00:12<00:02, 33.63image/s]
-                #  vs. ~45image/s with using output = model(image)
-                #  See old code at a4637c05588511f0ca9da2f298b1effeed8fe880
-                val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
-                if isinstance(val_outputs, list):
-                    val_outputs = torch.stack(val_outputs)
-                segmented_slice = np.uint8(torch.argmax(val_outputs, dim=1).cpu().numpy().squeeze())
-                segmented_slice_ensemble_all.append(segmented_slice)
-
-            # Do not aggregate the predictions from the different models if only one model is used
-            if len(models) == 1:
-                segmented_slice_ensemble_all_aggregated = segmented_slice_ensemble_all[0]
-            else:
-                # Aggregate the predictions from the different models using majority voting
-                segmented_slice_ensemble_all_aggregated = majority_voting(np.array(segmented_slice_ensemble_all))
-                # Alternative approach using mean:
-                #  segmented_slice_ensemble = np.mean(segmented_slice_ensemble_all, axis=0)
-                if args.uncertainty:
-                    segmented_slice_ensemble_std = np.std(segmented_slice_ensemble_all, axis=0)
-            # Add the segmented slice to the list of segmented slices
-            segmented_slices.append(segmented_slice_ensemble_all_aggregated)
-            if args.uncertainty:
-                segmented_slices_std.append(segmented_slice_ensemble_std)
-
-    # Stack the segmented slices to create the segmented 3D volume
-    segmented_volume = np.stack(segmented_slices, axis=-1)
-    segmented_volume = segmented_volume.astype(np.uint8)
-
-    # Save the segmented volume as a NIFTI file
-    fname_out = add_suffix_to_filename(fname_in, '_seg')
-    segmented_nifti = nib.Nifti1Image(segmented_volume, nifti_volume.affine)
-    nib.save(segmented_nifti, fname_out)
-
-    print(f"Done! Output file: {fname_out}")
-
-    if args.uncertainty:
-        # Stack the standard deviations of the segmented slices to create the segmented 3D volume
-        segmented_volume_std = np.stack(segmented_slices_std, axis=-1)
-        segmented_volume_std = segmented_volume_std.astype(np.float32)
-
-        # Save the standard deviations of the segmented slices as a NIFTI file
-        fname_out = add_suffix_to_filename(fname_in, '_seg_std')
-        segmented_nifti_std = nib.Nifti1Image(segmented_volume_std, nifti_volume.affine)
-        nib.save(segmented_nifti_std, fname_out)
-
-        print(f"Done! Output file: {fname_out}")
+    print('Total time elapsed: {:.2f} seconds'.format(end - start))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
-
-
-# # DEBUGGING CODE
-# import matplotlib.pyplot as plt
-# plt.figure("check", (12, 6))
-# plt.subplot(1, 2, 1)
-# plt.title("image")
-# plt.imshow(image[0, 0, :, :].squeeze(), cmap="gray")
-# plt.subplot(1, 2, 2)
-# plt.title("prediction")
-# plt.imshow(val_outputs[0, 1, :, :].squeeze(), cmap="hot")

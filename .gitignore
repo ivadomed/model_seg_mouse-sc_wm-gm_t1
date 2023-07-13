@@ -10,3 +10,6 @@ artifacts/
 
 # Predictions
 prediction*.*
+
+# Other storage files
+.DS_Store
