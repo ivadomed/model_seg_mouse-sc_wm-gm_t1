@@ -35,6 +35,7 @@ import time
 
 from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
 
+
 def get_parser():
     # parse command line arguments
     parser = argparse.ArgumentParser(description='Segment images using nnUNet')
@@ -120,7 +121,6 @@ def convert_filenames_to_nnunet_format(path_dataset):
     return path_tmp
 
 
-
 def main():
 
     parser = get_parser()
@@ -194,6 +194,7 @@ def main():
     print('----------------------------------------------------')
 
     print('Total time elapsed: {:.2f} seconds'.format(end - start))
+
 
 if __name__ == '__main__':
     main()
