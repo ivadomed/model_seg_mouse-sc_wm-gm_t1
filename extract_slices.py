@@ -1,3 +1,23 @@
+"""Extract annotated slices from MRI image and segmentation mask
+
+This python script extracts the segmentations masks slices which are annotated as well as the corresponding mri image slice.
+It creates a new folder with the BIDS dataset format.
+
+Example of run:
+
+    $ python extract_slices.py --path-data /path/to/data --path-out /path/to/project/folder
+
+Arguments:
+
+    --path-data : Path to BIDS structured dataset.
+    --path-out : Path to output directory.
+    
+Todo:
+    * 
+
+Pierre-Louis Benveniste
+"""
+
 import os
 import numpy as np
 from nibabel import load, Nifti1Image, save
