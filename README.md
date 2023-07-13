@@ -52,7 +52,7 @@ mkdir nnUNet_preprocessed
 mkdir nnUNet_results
 ~~~
 
-**Extract slices**
+### Extract slices
 
 Extract slices from the original file (dimension (500,500,200)) and their label, and create a new file (dimesion (500,500,1)) in another dataset folder:
 
@@ -60,7 +60,7 @@ Extract slices from the original file (dimension (500,500,200)) and their label,
 python ./utils/extract_slices.py --path-data /path/to/data --path-out /path/to/project/folder
 ~~~
 
-**Crop images**
+### Crop images
 
 Crop images and their respective mask in order to remove certain slices: 
 
@@ -68,7 +68,7 @@ Crop images and their respective mask in order to remove certain slices:
 python ./utils/crop_image_and_mask.py --folder-path /path/to/folder/  --file-name file_name.nii.gz --first-slice XXX --last-slice XXX
 ~~~
 
-**Convert from BIDS to nnU-Net file structure**
+### Convert from BIDS to nnU-Net file structure
 
 Before using the nnU-Net model, we convert the dataset from the BIDS format to the nnU-Net fornat:
 
