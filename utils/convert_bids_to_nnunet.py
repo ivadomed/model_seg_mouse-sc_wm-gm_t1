@@ -12,7 +12,8 @@ Example of run:
 Arguments:
 
     --path-data : Path to BIDS structured dataset. Accepts both cross-sectional and longitudinal datasets
-    --path-out' : Specify the task name - usually the anatomy to be segmented, e.g. Hippocampus
+    --path-out : Path to output directory.
+    --taskname: Specify the task name - usually the anatomy to be segmented, e.g. Hippocampus
     --tasknumber : Specify the task number, has to be greater than 100 but less than 999
     --label-folder : Path to the label folders in derivatives (default='manual_masks')
     
