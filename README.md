@@ -1,6 +1,6 @@
 # White and grey matter segmentation on T1-weighted exvivo mouse spinal cord
 
-[![DOI](https://zenodo.org/badge/587907110.svg)](https://zenodo.org/badge/10.5281/zenodo.7772350/587907110)
+[![DOI](https://zenodo.org/badge/587907110.svg)](https://doi.org/10.5281/zenodo.7772350)
 
 https://user-images.githubusercontent.com/2482071/227744144-ff9b21c3-d757-4e4c-a990-f6d7bf3084b0.mov
 
