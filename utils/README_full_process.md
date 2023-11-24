@@ -1,53 +1,6 @@
-# Training and testing a nnUNet model for SC WM and GM segmentation
+# Training of a nnUNet model for SC WM and GM segmentation
 
-[![DOI](https://zenodo.org/badge/587907110.svg)](https://doi.org/10.5281/zenodo.7772350)
-
-https://user-images.githubusercontent.com/2482071/227744144-ff9b21c3-d757-4e4c-a990-f6d7bf3084b0.mov
-
-Here, we describe how we trained the model for spinal cord white and grey matter segmentation and how to use it.
-
-## Citation
-
-Publication linked to the dataset: Coming soon!
-
-Publication linked to this model: see [CITATION.cff](./CITATION.cff)
-
-
-## Project description
-
-In this project, we trained a 3D nnU-Net for spinal cord white and grey matter segmentation. The data contains 22 mice with different number of chunks, for a total of 72 MRI 3D images. Each MRI image is T2-weighted, has a size of 200x200x500, with the following resolution: 0.05x0.05x0.05 mm. 
-
-In order to train a 3D nnU-Net, the following steps were completed: 
-- First, a total of 161 slices were labelled on various subjects. See [Notes](#notes) for details on the manual labeling.
-- The slices were then extracted using the [extract_slices.py](./utils/extract_slices.py) function: it extracted both the slice from the MRI image as well as the mask's slice. These were gathered into a temporary dataset, on which a 2D nnU-Net model was trained to segment spinal cord white and grey matter. The inference was then performed using this model on the full 3D volume from the original dataset. 
-- Then, a 3D nnU-Net was trained on the images, using the results from the previous inference as ground truth as well as using extracted slices (of shape (200x200x1)) and their manual segmentation. The inference, was again performed on the full zurich-mouse dataset. Going from a 2D nnU-Net to a 3D nnU-Net helped improved the continuity of the segmentation on the z-axis. 
-- After that, we selected the best segmentation masks on the dataset totalling 31 images. For each of these images we noted that the top and bottom slices were often poorly annotated. Using the [crop_image_and_mask.py](./utils/crop_image_and_mask.py) script we removed these slices. The objective was to keep only qualitative annotations. 
-- Finally, a 3D nnU-Net was trained on these qualitative image segmentations (31 images) with various dimension as well as annotated slices (161 images). The nnU-Net was trained on 1000 epochs, with "3d_fullres" configuration and on 5 folds. The best Dice score were the following (fold 0 : 0.9135, fold 1: 0.9083, fold 2: 0.9109 , fold 3: 0.9132, fold 4: 0.9173). 
-
-For the packaging we decided to keep only fold 4 as it has the best dice score and all performed similarly in terms of final results as well as training evolution (meaning that the dataset is rather homogeneous). The reason for this is to avoid having to upload the full results model which weight around 5 GB and limit ourself to 250 MB. Also, inference is much longer when performed on 5 folds instead of 1 and results are comparable. 
-
-## Installations
-
-Clone the repository:
-~~~
-git clone https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1.git
-cd model_seg_mouse-sc_wm-gm_t1
-~~~
-
-We recommend to use a virtual environment with python 3.9 to use nnUNet: 
-~~~
-conda create -n venv_nnunet python=3.9
-~~~
-
-We activate the environment:
-~~~
-conda activate venv_nnunet
-~~~
-
-Then install the required libraries:
-~~~
-pip install -r requirements.txt
-~~~
+First, you need to perform the installation instructions from the [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/README.md).
 
 ## Data
 
@@ -89,7 +42,7 @@ python ./utils/convert_bids_to_nnunet.py --path-data /path/to/data_extracted --p
 
 This will output a dataset called `DatasetDATASET-ID_TASK-NAME` in the `/nnUNet_raw` folder. (DATASET-ID has to be between 100 and 999).
 
-> **Note**
+> [!NOTE] 
 > In the `convert_bids_to_nnunet` script, all the labeled data is used for training and the unlabeled-data is used for inference.
 
 ### Convert from nnU-Net file structure to BIDS
@@ -115,7 +68,7 @@ nnUNetv2_plan_and_preprocess -d DATASET-ID --verify_dataset_integrity
 ~~~
 
 You will get the configuration plan for all four configurations (2d, 3d_fullres, 3d_lowres, 3d_cascade_fullres).
-
+> [!NOTE] 
 > In the case of the zurich_mouse dataset, nifti files are not fully annotated, therefore we use a 2d configuration.
 
 
@@ -125,7 +78,7 @@ To train the model, use the following command:
 ~~~
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_train DATASET-ID CONFIG FOLD --npz
 ~~~
-
+> [!NOTE] 
 > Example for Dataset 101, on 2d config on fold 0: CUDA_VISIBLE_DEVICES=2 nnUNetv2_train 101 2d 0 --npz
 
 You can track the progress of the model with: 
@@ -134,6 +87,8 @@ nnUNet_results/DatasetDATASET-ID_TASK-NAME/nnUNetTrainer__nnUNetPlans__CONFIG/fo
 ~~~
 
 ## Run inference
+
+Here are the alernatives method from the one given in [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/README.md) to perform inference. 
 
 To run an inference and obtain a segmentation, there are multiple ways to do so. 
 
@@ -150,47 +105,10 @@ You can now access the predictions in the folder `/path/to/predictions`.
 ### Method 2 - Using our trained model on terminal 
 
 Format the image data to the nnU-Net file structure. 
-Download the `Dataset500_zurich_mouse.zip` from the release and unzip it in the `/nnUNet_results` folder (it also requires to export the 3 variables as done previously). 
+Download the `model.zip` from the [release](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) and unzip it in the `/nnUNet_results` folder (it also requires to export the 3 variables as done previously). 
 Then run the terminal command linde:
 ~~~
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/predictions -d 500 -c 3d_fullres --save_probabilities -chk checkpoint_best.pth -f 4
 ~~~
 
 You can now access the predictions in the folder `/path/to/predictions`. 
-
-### Method 3 - Using our trained model with `test.py`
-
-Download the model `Dataset500_zurich_mouse.zip` from the release and unzip it. 
-Use the `test.py` function:
-
-To run on an entire dataset:
-~~~
-python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
-
-To run on individual(s) NIfTI image(s):
-~~~
-python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
-
-> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder.
-
-> To use GPU, add the flag `--use-gpu` in the previous command.
-
-> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.
-
-## Apply post-processing
-
-nnU-Net v2 comes with the possiblity of performing post_processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
-
-~~~
-CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
-~~~
-
-> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.
-
-> The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json`. 
-
-## Notes
-
-Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
