@@ -58,7 +58,6 @@ pip install -r requirements.txt
 To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md) for alternatives). 
 
 Download the (model.zip)[https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3] from the release and unzip it. 
-Use the `test.py` function:
 
 To run on individual(s) NIfTI image(s):
 ~~~
