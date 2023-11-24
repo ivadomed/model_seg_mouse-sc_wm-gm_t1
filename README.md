@@ -15,6 +15,9 @@ Publication linked to this model: see [CITATION.cff](./CITATION.cff)
 
 In this project, we trained a 3D nnU-Net for spinal cord white and grey matter segmentation. The data contains 22 mice with different number of chunks, for a total of 72 MRI 3D images. Each MRI image is T2-weighted, has a size of 200x200x500, with the following resolution: 0.05x0.05x0.05 mm. 
 
+<details>
+  <summary>Expand this for more information on how we trained the model</summary>
+  
 In order to train a 3D nnU-Net, the following steps were completed: 
 - First, a total of 161 slices were labelled on various subjects. See [Notes](#notes) for details on the manual labeling.
 - The slices were then extracted using the [extract_slices.py](./utils/extract_slices.py) function: it extracted both the slice from the MRI image as well as the mask's slice. These were gathered into a temporary dataset, on which a 2D nnU-Net model was trained to segment spinal cord white and grey matter. The inference was then performed using this model on the full 3D volume from the original dataset. 
@@ -23,6 +26,8 @@ In order to train a 3D nnU-Net, the following steps were completed:
 - Finally, a 3D nnU-Net was trained on these qualitative image segmentations (31 images) with various dimension as well as annotated slices (161 images). The nnU-Net was trained on 1000 epochs, with "3d_fullres" configuration and on 5 folds. The best Dice score were the following (fold 0 : 0.9135, fold 1: 0.9083, fold 2: 0.9109 , fold 3: 0.9132, fold 4: 0.9173). 
 
 For the packaging we decided to keep only fold 4 as it has the best dice score and all performed similarly in terms of final results as well as training evolution (meaning that the dataset is rather homogeneous). The reason for this is to avoid having to upload the full results model which weight around 5 GB and limit ourself to 250 MB. Also, inference is much longer when performed on 5 folds instead of 1 and results are comparable. 
+
+</details>
 
 This `README` file shows how to use the model which we trained to infer predictions. For information on how to retrain the same model, refer to this file [README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md). 
 
