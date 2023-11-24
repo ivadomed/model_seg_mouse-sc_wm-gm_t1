@@ -55,7 +55,7 @@ pip install -r requirements.txt
 
 ## Perform predictions
 
-To run an inference and obtain a segmentation, we advise using the following method (refer to `utils/README_full_process.md` for alternatives). 
+To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md) for alternatives). 
 
 Download the model `Dataset500_zurich_mouse.zip` from the release and unzip it. 
 Use the `test.py` function:
