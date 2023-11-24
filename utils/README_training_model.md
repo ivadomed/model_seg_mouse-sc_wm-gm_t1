@@ -1,6 +1,6 @@
 # Training of a nnUNet model for SC WM and GM segmentation
 
-First, you need to perform the installation instructions from the [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/README.md).
+First, you need to perform the installation instructions from the [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/README.md).
 
 ## Data
 
@@ -88,7 +88,7 @@ nnUNet_results/DatasetDATASET-ID_TASK-NAME/nnUNetTrainer__nnUNetPlans__CONFIG/fo
 
 ## Run inference
 
-Here are the alernatives method from the one given in [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/README.md) to perform inference. 
+Here are the alernatives method from the one given in [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/README.md) to perform inference. 
 
 To run an inference and obtain a segmentation, there are multiple ways to do so. 
 
