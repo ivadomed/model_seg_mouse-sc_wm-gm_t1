@@ -60,14 +60,14 @@ To run an inference and obtain a segmentation, we advise using the following met
 Download the model `Dataset500_zurich_mouse.zip` from the release and unzip it. 
 Use the `test.py` function:
 
-To run on an entire dataset:
-~~~
-python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
-
 To run on individual(s) NIfTI image(s):
 ~~~
 python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
+~~~
+
+To run on an entire dataset:
+~~~
+python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
 
 > The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder.
