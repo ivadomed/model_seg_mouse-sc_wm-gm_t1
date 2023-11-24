@@ -30,7 +30,6 @@ import os
 import argparse
 import torch
 from pathlib import Path
-#from batchgenerators.utilities.file_and_folder_operations import join
 import time
 
 from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
@@ -79,7 +78,7 @@ def splitext(fname):
 def add_suffix(fname, suffix):
     """
     Add suffix between end of file name and extension. Taken (shamelessly) from:
-    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
+    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py and adapted
 
     :param fname: absolute or relative file name. Example: t2.nii.gz
     :param suffix: suffix. Example: _mean
@@ -95,6 +94,12 @@ def add_suffix(fname, suffix):
 
 
 def convert_filenames_to_nnunet_format(path_dataset):
+    """
+    This functions convert filenames from a dataset to the nnunet format (i.e. adding 0000 at the end) in a tmp folder
+
+    :param path_dataset: path to the input dataset
+    :return: temporary folder containing formatted files
+    """
 
     # create a temporary folder at the same level as the test folder
     path_tmp = os.path.join(os.path.dirname(path_dataset), 'tmp')
