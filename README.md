@@ -29,7 +29,7 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 </details>
 
-This `README` file shows how to use the model which we trained to infer predictions. For information on how to retrain the same model, refer to this file [README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md). 
+For information on how to retrain the same model, refer to this file [README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md). 
 
 If you wish to try the model on your own data, follow the instructions at [Installation](#installation) and [Perform predictions](#perform-predictions).
 
