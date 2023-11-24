@@ -21,7 +21,6 @@ Pierre-Louis Benveniste
 import os
 import numpy as np
 from nibabel import load, Nifti1Image, save
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import argparse
 import pathlib
