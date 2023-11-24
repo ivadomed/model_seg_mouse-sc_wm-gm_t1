@@ -57,7 +57,7 @@ pip install -r requirements.txt
 
 To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md) for alternatives). 
 
-Download the (model.zip)[https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3] from the release and unzip it. 
+Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
 
 To run on individual(s) NIfTI image(s):
 ~~~
@@ -68,11 +68,9 @@ To run on an entire dataset:
 ~~~
 python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
-
-> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder.
-
-> To use GPU, add the flag `--use-gpu` in the previous command.
-
+> [!NOTE]  
+> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder. <br>
+> To use GPU, add the flag `--use-gpu` in the previous command.<br>
 > To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.
 
 ## Apply post-processing
@@ -82,9 +80,8 @@ nnU-Net v2 comes with the possiblity of performing post_processing on the segmen
 ~~~
 CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
 ~~~
-
-> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.
-
+> [!NOTE]  
+> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.<br>
 > The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json`. 
 
 ## Notes
