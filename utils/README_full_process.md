@@ -116,7 +116,6 @@ nnUNetv2_plan_and_preprocess -d DATASET-ID --verify_dataset_integrity
 
 You will get the configuration plan for all four configurations (2d, 3d_fullres, 3d_lowres, 3d_cascade_fullres).
 
-> **Note**
 > In the case of the zurich_mouse dataset, nifti files are not fully annotated, therefore we use a 2d configuration.
 
 
@@ -127,7 +126,6 @@ To train the model, use the following command:
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_train DATASET-ID CONFIG FOLD --npz
 ~~~
 
-> **Note**
 > Example for Dataset 101, on 2d config on fold 0: CUDA_VISIBLE_DEVICES=2 nnUNetv2_train 101 2d 0 --npz
 
 You can track the progress of the model with: 
@@ -165,7 +163,7 @@ You can now access the predictions in the folder `/path/to/predictions`.
 Download the model `Dataset500_zurich_mouse.zip` from the release and unzip it. 
 Use the `test.py` function:
 
-To run on the whole dataset:
+To run on an entire dataset:
 ~~~
 python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
@@ -175,6 +173,12 @@ To run on individual(s) NIfTI image(s):
 python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
 
+> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder.
+
+> To use GPU, add the flag `--use-gpu` in the previous command.
+
+> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.
+
 ## Apply post-processing
 
 nnU-Net v2 comes with the possiblity of performing post_processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
@@ -183,12 +187,10 @@ nnU-Net v2 comes with the possiblity of performing post_processing on the segmen
 CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
 ~~~
 
-> **Note**
-> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`
-> The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json` 
+> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.
+
+> The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json`. 
 
 ## Notes
 
 Procedure for ground truth mask creation: https://youtu.be/KVL-JzcSRTo
-
-Before applying the model, make sure the image orientation is correct. More details [here](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/25). 
