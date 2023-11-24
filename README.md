@@ -29,7 +29,7 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 </details>
 
-This `README` file shows how to use the model which we trained to infer predictions. For information on how to retrain the same model, refer to this file [README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md). 
+This `README` file shows how to use the model which we trained to infer predictions. For information on how to retrain the same model, refer to this file [README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md). 
 
 If you wish to try the model on your own data, follow the instructions at [Installation](#installation) and [Perform predictions](#perform-predictions).
 
@@ -60,7 +60,7 @@ pip install -r requirements.txt
 
 ## Perform predictions
 
-To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md) for alternatives). 
+To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md) for alternatives). 
 
 Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
 
@@ -80,7 +80,7 @@ python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output -
 
 ## Apply post-processing
 
-nnU-Net v2 comes with the possiblity of performing post_processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
+nnU-Net v2 comes with the possiblity of performing post-processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
 
 ~~~
 CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
