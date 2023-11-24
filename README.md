@@ -28,6 +28,8 @@ This `README` file shows how to use the model which we trained to infer predicti
 
 ## Installation
 
+This section explains how to install and use the model on new images. 
+
 Clone the repository:
 ~~~
 git clone https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1.git
