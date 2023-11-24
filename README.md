@@ -26,6 +26,8 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 This `README` file shows how to use the model which we trained to infer predictions. For information on how to retrain the same model, refer to this file [README_full_process.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_full_process.md). 
 
+If you wish to try the model on your own data, follow the instructions at #installation and #perform-predictions.
+
 ## Installation
 
 This section explains how to install and use the model on new images. 
