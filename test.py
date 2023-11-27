@@ -30,7 +30,6 @@ import os
 import argparse
 import torch
 from pathlib import Path
-from batchgenerators.utilities.file_and_folder_operations import join
 import time
 
 from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
@@ -49,19 +48,11 @@ def get_parser():
     parser.add_argument('--path-model', required=True, 
                         help='Path to the model directory. This folder should contain individual folders '
                         'like fold_0, fold_1, etc.',)
-    #Removed because in this case we only have one fold
-    # parser.add_argument('--use-all-folds', action='store_true', default=False,
-    #                     help='Specify the folds of the trained model that should be used for prediction. '
-    #                          'Default: (0, 1, 2, 3, 4)')
     parser.add_argument('--use-gpu', action='store_true', default=False,
                         help='Use GPU for inference. Default: False')
     parser.add_argument('--use-mirroring', action='store_true', default=False,
                         help='Use mirroring (test-time) augmentation for prediction. '
                         'NOTE: Inference takes a long time when this is enabled. Default: False')
-    #Removed the following as we always use the best_checkpoint.pth model (only one stored)
-    # parser.add_argument('--use-best-checkpoint', action='store_true', default=False,
-    #                     help='Use the best checkpoint (instead of the final checkpoint) for prediction. '
-    #                     'NOTE: nnUNet by default uses the final checkpoint. Default: False')
 
     return parser
 
@@ -87,7 +78,7 @@ def splitext(fname):
 def add_suffix(fname, suffix):
     """
     Add suffix between end of file name and extension. Taken (shamelessly) from:
-    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
+    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py and adapted
 
     :param fname: absolute or relative file name. Example: t2.nii.gz
     :param suffix: suffix. Example: _mean
@@ -103,20 +94,24 @@ def add_suffix(fname, suffix):
 
 
 def convert_filenames_to_nnunet_format(path_dataset):
+    """
+    This functions convert filenames from a dataset to the nnunet format (i.e. adding 0000 at the end) in a tmp folder
+
+    :param path_dataset: path to the input dataset
+    :return: temporary folder containing formatted files
+    """
 
     # create a temporary folder at the same level as the test folder
     path_tmp = os.path.join(os.path.dirname(path_dataset), 'tmp')
     if not os.path.exists(path_tmp):
         os.makedirs(path_tmp, exist_ok=True)
 
-    for f in os.listdir(path_dataset):
-        if f.endswith('.nii.gz'):
-            # get absolute path to the image
-            f = os.path.join(path_dataset, f)
+    for f in list(Path(path_dataset).rglob(f'*.nii.gz')):
+        if str(f).endswith('.nii.gz'):
             # add suffix
-            f_new = add_suffix(f, '_0000')
+            f_new = add_suffix(str(f), '_0000')
             # copy to tmp folder
-            os.system('cp {} {}'.format(f, os.path.join(path_tmp, os.path.basename(f_new))))
+            os.system('cp {} {}'.format(str(f), os.path.join(path_tmp, os.path.basename(f_new))))
 
     return path_tmp
 
@@ -148,15 +143,10 @@ def main():
         # NOTE: for individual images, the _0000 suffix is not needed. BUT, the images should be in a list of lists
         # get list of images from input argument
         print(f'Found {len(args.path_images)} images. Running inference on them...')
-        # path_data_tmp = [[os.path.basename(f)] for f in args.path_images]
         path_data_tmp = [[f] for f in args.path_images]
         print(path_data_tmp)
 
         path_out = args.path_out
-        # # add suffix '_pred' to predicted images
-        # for f in args.path_images:
-        #     path_pred = os.path.join(args.path_out, add_suffix(f, '_pred')) 
-        #     path_out.append(path_pred)
 
     # uses all the folds available in the model folder by default
     folds_avail = [int(f.split('_')[-1]) for f in os.listdir(args.path_model) if f.startswith('fold_')]
