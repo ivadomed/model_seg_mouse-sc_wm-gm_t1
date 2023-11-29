@@ -64,7 +64,7 @@ To run an inference and obtain a segmentation, we advise using the following met
 
 Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
 
-To run on individual(s) NIfTI image(s):
+To run on individual(s) NIfTI image(s) (format `.nii.gz`):
 ~~~
 python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
