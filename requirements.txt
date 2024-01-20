@@ -1,6 +1,6 @@
-nnunetv2==2.0
-torch==2.0.0
-nibabel==5.0.1
-numpy==1.24.3
-torchvision==0.15.1
-tqdm==4.65.0
+nnunetv2==2.2.1
+torch==2.0.1
+nibabel
+numpy
+torchvision
+tqdm
