@@ -28,8 +28,15 @@ import torch
 import glob
 import time
 import tempfile
+import numpy as np
 
 from utils.image import Image, change_orientation
+import nibabel as nib
+
+# We define the environment variables here to avoid a warning from nnunetv2
+os.environ['nnUNet_raw'] = "./nnUNet_raw"
+os.environ['nnUNet_preprocessed'] = "./nnUNet_preprocessed"
+os.environ['nnUNet_results']="./nnUNet_results"
 
 # Import for nnunetv2
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
@@ -53,42 +60,6 @@ def get_parser():
     return parser
 
 
-def splitext(fname):
-        """
-        Split a fname (folder/file + ext) into a folder/file and extension.
-
-        Note: for .nii.gz the extension is understandably .nii.gz, not .gz
-        (``os.path.splitext()`` would want to do the latter, hence the special case).
-        Taken (shamelessly) from: https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
-        """
-        dir, filename = os.path.split(fname)
-        for special_ext in ['.nii.gz', '.tar.gz']:
-            if filename.endswith(special_ext):
-                stem, ext = filename[:-len(special_ext)], special_ext
-                return os.path.join(dir, stem), ext
-        # If no special case, behaves like the regular splitext
-        stem, ext = os.path.splitext(filename)
-        return os.path.join(dir, stem), ext
-
-
-def add_suffix(fname, suffix):
-    """
-    Add suffix between end of file name and extension. Taken (shamelessly) from:
-    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py and adapted
-
-    :param fname: absolute or relative file name. Example: t2.nii.gz
-    :param suffix: suffix. Example: _mean
-    :return: file name with suffix. Example: t2_mean.nii
-
-    Examples:
-
-    - add_suffix(t2.nii, _mean) -> t2_mean.nii
-    - add_suffix(t2.nii.gz, a) -> t2a.nii.gz
-    """
-    stem, ext = splitext(fname)
-    return os.path.join(stem + suffix + ext)
-
-
 def main():
 
     parser = get_parser()
@@ -101,26 +72,38 @@ def main():
     fname_file = args.path_image
 
     # Create temporary directory in the temp to store the reoriented images
-    prefix = f"sciseg_prediction_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_"
-    tmpdir = tempfile.mkdtemp(prefix=prefix)
+    tmpdir = os.path.join(args.path_out, f"mouse_gm_wm_seg_pred_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_")
+    print('Creating temporary directory')
+    os.makedirs(tmpdir, exist_ok=True)
 
     # Copy the file to the temporary directory using shutil.copyfile
     fname_file_tmp = os.path.join(tmpdir, os.path.basename(fname_file))
     shutil.copyfile(fname_file, fname_file_tmp)
-    print(f'Copied {fname_file} to {fname_file_tmp}')
+    print(f'Copied file to {fname_file_tmp}')
 
-    # Change orientation to LPI
+    # change resolution if needed
+    img_updated_zooms = nib.load(fname_file_tmp)
+    orig_resolution = list(img_updated_zooms.header.get_zooms())
+    ratio = 0.05 / min(orig_resolution)
+    if 1/ratio > 5 :
+        dimensions = [orig_resolution[0] / 20, orig_resolution[1] /20, orig_resolution[2] /20]
+        # Update the image header
+        img_updated_zooms.header.set_zooms(dimensions)
+        img_updated_zooms.set_sform(img_updated_zooms.get_qform())
+        print("Resampling image to fit memory availability")
+        nib.save(img_updated_zooms, fname_file_tmp)
+        #nib.save(img_updated_zooms, os.path.join(args.path_out, "image_resized.nii.gz"))
+    
+
+    # Reorient the image to LPI orientation
     image_temp = Image(fname_file_tmp)
-    # Store original orientation
     orig_orientation = image_temp.orientation
-
-    # Reorient the image to RPI orientation if not already in RPI
     if orig_orientation != 'LPI':
-        # reorient the image to RPI using SCT
-        os.system('sct_image -i {} -setorient LPI -o {}'.format(fname_file_tmp, fname_file_tmp))
-    # image_temp.change_orientation('LPI')
-    # image_temp.save(fname_file_tmp)
-
+        print('Reorienting image to LPI orientation')
+        image_temp.change_orientation('LPI')
+        image_temp.save(fname_file_tmp)
+        #image_temp.save(os.path.join(args.path_out, "image_resized_rotated.nii.gz"))
+        
     # NOTE: for individual images, the _0000 suffix is not needed.
     # BUT, the images should be in a list of lists
     fname_file_tmp_list = [[fname_file_tmp]]
@@ -130,7 +113,6 @@ def main():
 
     # Create directory for nnUNet prediction
     tmpdir_nnunet = os.path.join(tmpdir, 'nnUNet_prediction')
-    fname_prediction = os.path.join(tmpdir_nnunet, os.path.basename(add_suffix(fname_file_tmp, '_pred')))
     os.mkdir(tmpdir_nnunet)
 
     # Run nnUNet prediction
@@ -175,6 +157,27 @@ def main():
     print('Inference done.')
     total_time = end - start
     print('Total inference time: {} minute(s) {} seconds'.format(int(total_time // 60), int(round(total_time % 60))))
+
+    # copy the prediction file to the output directory
+    pred_file = glob.glob(os.path.join(tmpdir_nnunet, '*.nii.gz'))[0]
+    out_file = os.path.join(args.path_out, str(args.path_image.split('/')[-1].split('.')[0]) + '_pred.nii.gz')
+    shutil.copyfile(pred_file, out_file)
+    #shutil.copyfile(pred_file, os.path.join(args.path_out, "model_ouput.nii.gz"))
+
+    # change orientation back to original
+    if orig_orientation != 'LPI':
+        image_temp = Image(out_file)
+        image_temp.change_orientation(orig_orientation)
+        image_temp.save(out_file)
+        #image_temp.save(os.path.join(args.path_out, "model_ouput_rotated.nii.gz"))
+
+    # change resolution back to original
+    if 1/ratio > 5 :
+        img_reupdated_zooms = nib.load(out_file)
+        img_reupdated_zooms.header.set_zooms(orig_resolution)
+        img_reupdated_zooms.set_sform(img_reupdated_zooms.get_qform())
+        nib.save(img_reupdated_zooms, out_file)
+        #nib.save(img_reupdated_zooms, os.path.join(args.path_out, "model_ouput_rotated_resized.nii.gz"))
 
     print('Deleting the temporary folder...')
     # Delete the temporary folder
