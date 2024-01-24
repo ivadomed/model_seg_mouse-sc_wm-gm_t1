@@ -72,8 +72,8 @@ python test.py --path-image /path/to/image --path-out /path/to/output --path-mod
 > [!NOTE]  
 > The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder. <br>
 > To use GPU, add the flag `--use-gpu` in the previous command.<br>
-> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.
-> To speed up inference, add flag `--step-size XX` with X being a value above 0.5 and below 1 (0.9 is advised). 
+> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.<br>
+> To speed up inference, add flag `--step-size XX` with X being a value above 0.5 and below 1 (0.9 is advised).<br>
 > If inference fails : refer to the following [issue 44](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/44) for image pre-processing. 
 
 ## Apply post-processing
