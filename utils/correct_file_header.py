@@ -9,7 +9,7 @@ Example of run:
 Arguments:
     --path-image : Path to the individual image to segment.
     --path-out : Path to output directory
-    --resolution : Resolution of the nifti file. Default: 0.05 0.05 0.05
+    --resolution : Resolution of the nifti file in mm. Default: 0.05 0.05 0.05
 
 Returns:
     None
@@ -31,7 +31,7 @@ def get_parser():
     parser.add_argument('--path-image', default=None,type=str)
     parser.add_argument('--path-out', help='Path to output directory.', required=True)
     parser.add_argument('--resolution', default=[0.05, 0.05, 0.05], type=float, nargs=3,
-                        help='Resolution of the nifti file (separated by spaces). Default: 0.05 0.05 0.05')
+                        help='Resolution of the nifti file in mm (separated by spaces). Default: 0.05 0.05 0.05')
     return parser
 
 def main():
