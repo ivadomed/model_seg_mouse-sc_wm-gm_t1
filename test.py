@@ -1,23 +1,17 @@
 """Inference of 3D nnU-Net model
 
-This python script runs inference of the 3D nnU-Net model on nifti images.  
+This python script runs inference of the 3D nnU-Net model on individual nifti images.  
 
 Example of run:
-
-    Method 1 (when running on whole dataset):
-        $ python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/model
-
-    Method 2 (when running on individual images):
-        $ python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/model 
+        $ python test.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/model 
 
 Arguments:
-
-    --path-dataset : Path to the test dataset folder. Use this argument only if you want predict on a whole dataset
-    --path-images : List of images to segment. Use this argument only if you want predict on a single image or list of invidiual images
+    --path-image : Path to the individual image to segment.
     --path-out : Path to output directory
     --path-model : Path to the model directory. This folder should contain individual folders like fold_0, fold_1, etc.'
     --use-gpu : Use GPU for inference. Default: False
     --use-mirroring : Use mirroring (test-time) augmentation for prediction. NOTE: Inference takes a long time when this is enabled. Default: False
+    --step-size : Step size for sliding window. Default: 0.5. A higher value makes inference faster. If inference fails, try increasing this value.
     
 Todo:
     * 
@@ -25,25 +19,34 @@ Todo:
 Script inspired by script from Naga Karthik.
 Pierre-Louis Benveniste
 """
-
 import os
+import shutil
+import subprocess
 import argparse
-import torch
-from pathlib import Path
-import time
+import datetime
 
-from nnunetv2.inference.predict_from_raw_data import predict_from_raw_data as predictor
+import torch
+import glob
+import time
+import tempfile
+
+from utils.image import Image, change_orientation
+import nibabel as nib
+
+# We define the environment variables here to avoid a warning from nnunetv2
+os.environ['nnUNet_raw'] = "./nnUNet_raw"
+os.environ['nnUNet_preprocessed'] = "./nnUNet_preprocessed"
+os.environ['nnUNet_results']="./nnUNet_results"
+
+# Import for nnunetv2
+from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+from batchgenerators.utilities.file_and_folder_operations import join
 
 
 def get_parser():
     # parse command line arguments
     parser = argparse.ArgumentParser(description='Segment images using nnUNet')
-    parser.add_argument('--path-dataset', default=None, type=str,
-                        help='Path to the test dataset folder. Use this argument only if you want '
-                        'predict on a whole dataset.')
-    parser.add_argument('--path-images', default=None, nargs='+', type=str,
-                        help='List of images to segment. Use this argument only if you want '
-                        'predict on a single image or list of invidiual images.')
+    parser.add_argument('--path-image', default=None,type=str)
     parser.add_argument('--path-out', help='Path to output directory.', required=True)
     parser.add_argument('--path-model', required=True, 
                         help='Path to the model directory. This folder should contain individual folders '
@@ -53,67 +56,9 @@ def get_parser():
     parser.add_argument('--use-mirroring', action='store_true', default=False,
                         help='Use mirroring (test-time) augmentation for prediction. '
                         'NOTE: Inference takes a long time when this is enabled. Default: False')
-
+    parser.add_argument('--step-size', default=0.5, type=float,
+                        help='Step size for sliding window. Default: 0.5. A higher value makes inference faster. If inference fails, try increasing this value.')
     return parser
-
-
-def splitext(fname):
-        """
-        Split a fname (folder/file + ext) into a folder/file and extension.
-
-        Note: for .nii.gz the extension is understandably .nii.gz, not .gz
-        (``os.path.splitext()`` would want to do the latter, hence the special case).
-        Taken (shamelessly) from: https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py
-        """
-        dir, filename = os.path.split(fname)
-        for special_ext in ['.nii.gz', '.tar.gz']:
-            if filename.endswith(special_ext):
-                stem, ext = filename[:-len(special_ext)], special_ext
-                return os.path.join(dir, stem), ext
-        # If no special case, behaves like the regular splitext
-        stem, ext = os.path.splitext(filename)
-        return os.path.join(dir, stem), ext
-
-
-def add_suffix(fname, suffix):
-    """
-    Add suffix between end of file name and extension. Taken (shamelessly) from:
-    https://github.com/spinalcordtoolbox/manual-correction/blob/main/utils.py and adapted
-
-    :param fname: absolute or relative file name. Example: t2.nii.gz
-    :param suffix: suffix. Example: _mean
-    :return: file name with suffix. Example: t2_mean.nii
-
-    Examples:
-
-    - add_suffix(t2.nii, _mean) -> t2_mean.nii
-    - add_suffix(t2.nii.gz, a) -> t2a.nii.gz
-    """
-    stem, ext = splitext(fname)
-    return os.path.join(stem + suffix + ext)
-
-
-def convert_filenames_to_nnunet_format(path_dataset):
-    """
-    This functions convert filenames from a dataset to the nnunet format (i.e. adding 0000 at the end) in a tmp folder
-
-    :param path_dataset: path to the input dataset
-    :return: temporary folder containing formatted files
-    """
-
-    # create a temporary folder at the same level as the test folder
-    path_tmp = os.path.join(os.path.dirname(path_dataset), 'tmp')
-    if not os.path.exists(path_tmp):
-        os.makedirs(path_tmp, exist_ok=True)
-
-    for f in list(Path(path_dataset).rglob(f'*.nii.gz')):
-        if str(f).endswith('.nii.gz'):
-            # add suffix
-            f_new = add_suffix(str(f), '_0000')
-            # copy to tmp folder
-            os.system('cp {} {}'.format(str(f), os.path.join(path_tmp, os.path.basename(f_new))))
-
-    return path_tmp
 
 
 def main():
@@ -121,70 +66,111 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
+    # Create the output path
     if not os.path.exists(args.path_out):
         os.makedirs(args.path_out, exist_ok=True)
-
-    if args.path_dataset is not None and args.path_images is not None:
-        raise ValueError('You can only specify either --path-dataset or --path-images (not both). See --help for more info.')
     
-    if args.path_dataset is not None:
-        print('Found a dataset folder. Running inference on the whole dataset...')
+    fname_file = args.path_image
 
-        # NOTE: nnUNet only wants the _0000 suffix for files contained in a folder (i.e. when inference is run on a whole dataset)
-        # hence, we create a temporary folder with the proper filenames and delete it after inference is done
-        # More info about that naming convention here: 
-        # https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/dataset_format_inference.md
+    # Create temporary directory in the temp to store the reoriented images
+    tmpdir = os.path.join(args.path_out, f"mouse_gm_wm_seg_pred_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_")
+    print('Creating temporary directory')
+    os.makedirs(tmpdir, exist_ok=True)
+
+    # Copy the file to the temporary directory using shutil.copyfile 
+    fname_file_tmp = os.path.join(tmpdir, os.path.basename(fname_file))
+    shutil.copyfile(fname_file, fname_file_tmp)
+    print(f'Copied file to {fname_file_tmp}')
+
+    # Convert file to nii.gz using nibabel
+    print('Converting file to nii.gz')
+    img = nib.load(fname_file_tmp)
+    fname_file_tmp = fname_file_tmp.split('.nii')[0] + '.nii.gz'
+    nib.save(img, fname_file_tmp)
+
+    # Reorient the image to LPI orientation
+    image_temp = Image(fname_file_tmp)
+    orig_orientation = image_temp.orientation
+    if orig_orientation != 'LPI':
+        print('Reorienting image to LPI orientation')
+        image_temp.change_orientation('LPI')
+        image_temp.save(fname_file_tmp)
+        #image_temp.save(os.path.join(args.path_out, "image_resized_rotated.nii.gz"))
         
-        print('Creating temporary folder with proper filenames...')
-        path_data_tmp = convert_filenames_to_nnunet_format(args.path_dataset)
-        path_out = args.path_out
+    # NOTE: for individual images, the _0000 suffix is not needed.
+    # BUT, the images should be in a list of lists
+    fname_file_tmp_list = [[fname_file_tmp]]
 
-    elif args.path_images is not None:
-        # NOTE: for individual images, the _0000 suffix is not needed. BUT, the images should be in a list of lists
-        # get list of images from input argument
-        print(f'Found {len(args.path_images)} images. Running inference on them...')
-        path_data_tmp = [[f] for f in args.path_images]
-        print(path_data_tmp)
-
-        path_out = args.path_out
-
-    # uses all the folds available in the model folder by default
+    # Use all the folds available in the model folder by default
     folds_avail = [int(f.split('_')[-1]) for f in os.listdir(args.path_model) if f.startswith('fold_')]
 
+    # Create directory for nnUNet prediction
+    tmpdir_nnunet = os.path.join(tmpdir, 'nnUNet_prediction')
+    os.mkdir(tmpdir_nnunet)
+
+    # Run nnUNet prediction
     print('Starting inference...')
     start = time.time()
-    # directly call the predict function
-    predictor(
-        list_of_lists_or_source_folder=path_data_tmp, 
-        output_folder=path_out,
-        model_training_output_dir=args.path_model,
-        use_folds=folds_avail,
-        tile_step_size=0.5,
-        use_gaussian=True,                                      # applies gaussian noise and gaussian blur
-        use_mirroring=True if args.use_mirroring else False,    # test time augmentation by mirroring on all axes
+
+    # instantiate the nnUNetPredictor
+    predictor = nnUNetPredictor(
+        tile_step_size=args.step_size,     # changing it from 0.5 to 0.9 makes inference faster
+        use_gaussian=True,                      # applies gaussian noise and gaussian blur
+        use_mirroring=args.use_mirroring,                    # test time augmentation by mirroring on all axes
         perform_everything_on_gpu=True if args.use_gpu else False,
-        device=torch.device('cuda', 0) if args.use_gpu else torch.device('cpu'),
+        device=torch.device('cuda') if args.use_gpu else torch.device('cpu'),
         verbose=False,
+        verbose_preprocessing=False,
+        allow_tqdm=True
+    )
+    print('Running inference on device: {}'.format(predictor.device))
+
+    # initializes the network architecture, loads the checkpoint
+    predictor.initialize_from_trained_model_folder(
+        join(args.path_model),
+        use_folds=folds_avail,
+        checkpoint_name='checkpoint_best.pth',
+    )
+    print('Model loaded successfully. Fetching test data...')
+
+    # NOTE: for individual files, the image should be in a list of lists
+    predictor.predict_from_files(
+        list_of_lists_or_source_folder=fname_file_tmp_list,
+        output_folder_or_list_of_truncated_output_files=tmpdir_nnunet,
         save_probabilities=False,
         overwrite=True,
-        checkpoint_name='checkpoint_best.pth',
-        num_processes_preprocessing=3,
-        num_processes_segmentation_export=3
+        num_processes_preprocessing=8,
+        num_processes_segmentation_export=8,
+        folder_with_segs_from_prev_stage=None,
+        num_parts=1,
+        part_id=0
     )
+    
     end = time.time()
-
     print('Inference done.')
+    total_time = end - start
+    print('Total inference time: {} minute(s) {} seconds'.format(int(total_time // 60), int(round(total_time % 60))))
+
+    # copy the prediction file to the output directory
+    pred_file = glob.glob(os.path.join(tmpdir_nnunet, '*.nii.gz'))[0]
+    out_file = os.path.join(args.path_out, str(args.path_image.split('/')[-1].split('.nii')[0]) + '_pred.nii.gz')
+    shutil.copyfile(pred_file, out_file)
+    #shutil.copyfile(pred_file, os.path.join(args.path_out, "model_ouput.nii.gz"))
+
+    # change orientation back to original
+    if orig_orientation != 'LPI':
+        image_temp = Image(out_file)
+        image_temp.change_orientation(orig_orientation)
+        image_temp.save(out_file)
+        #image_temp.save(os.path.join(args.path_out, "model_ouput_rotated.nii.gz"))
 
     print('Deleting the temporary folder...')
-    # delete the temporary folder
-    os.system('rm -rf {}'.format(path_data_tmp))
+    # Delete the temporary folder
+    shutil.rmtree(tmpdir)
 
     print('----------------------------------------------------')
     print('Results can be found in: {}'.format(args.path_out))
     print('----------------------------------------------------')
-
-    print('Total time elapsed: {:.2f} seconds'.format(end - start))
-
 
 if __name__ == '__main__':
     main()
