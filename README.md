@@ -64,19 +64,17 @@ To run an inference and obtain a segmentation, we advise using the following met
 
 Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
 
-To run on individual(s) NIfTI image(s) (format `.nii.gz`):
+To perform predictions on a Nifti image (".nii.gz" or ".nii")
 ~~~
-python test.py --path-images /path/to/image1 /path/to/image2 --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
+python test.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
 ~~~
 
-To run on an entire dataset:
-~~~
-python test.py --path-dataset /path/to/test-dataset --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
 > [!NOTE]  
 > The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder. <br>
 > To use GPU, add the flag `--use-gpu` in the previous command.<br>
 > To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.
+> To speed up inference, add flag `--step-size XX` with X being a value above 0.5 and below 1 (0.9 is advised). 
+> If inference fails : refer to the following [issue 43](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/pull/43) for image pre-processing. 
 
 ## Apply post-processing
 
