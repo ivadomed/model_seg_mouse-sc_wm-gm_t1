@@ -3,10 +3,10 @@
 This python script runs inference of the 3D nnU-Net model on individual nifti images.  
 
 Example of run:
-        $ python test.py --path-images /path/to/image1 --path-out /path/to/output --path-model /path/to/model 
+        $ python test.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/model 
 
 Arguments:
-    --path-images : List of images to segment. Use this argument only if you want predict on a single image or list of invidiual images
+    --path-image : Path to the individual image to segment.
     --path-out : Path to output directory
     --path-model : Path to the model directory. This folder should contain individual folders like fold_0, fold_1, etc.'
     --use-gpu : Use GPU for inference. Default: False
@@ -29,7 +29,6 @@ import torch
 import glob
 import time
 import tempfile
-import numpy as np
 
 from utils.image import Image, change_orientation
 import nibabel as nib
@@ -78,23 +77,16 @@ def main():
     print('Creating temporary directory')
     os.makedirs(tmpdir, exist_ok=True)
 
-    # Copy the file to the temporary directory using shutil.copyfile
+    # Copy the file to the temporary directory using shutil.copyfile 
     fname_file_tmp = os.path.join(tmpdir, os.path.basename(fname_file))
     shutil.copyfile(fname_file, fname_file_tmp)
     print(f'Copied file to {fname_file_tmp}')
 
-    # # change resolution if needed
-    # img_updated_zooms = nib.load(fname_file_tmp)
-    # orig_resolution = list(img_updated_zooms.header.get_zooms())
-    # ratio = 0.05 / min(orig_resolution)
-    # if 1/ratio > 5 :
-    #     dimensions = [orig_resolution[0] / 20, orig_resolution[1] /20, orig_resolution[2] /20]
-    #     # Update the image header
-    #     img_updated_zooms.header.set_zooms(dimensions)
-    #     img_updated_zooms.set_sform(img_updated_zooms.get_qform())
-    #     print("Resampling image to fit memory availability")
-    #     nib.save(img_updated_zooms, fname_file_tmp)
-    #     #nib.save(img_updated_zooms, os.path.join(args.path_out, "image_resized.nii.gz"))
+    # Convert file to nii.gz using nibabel
+    print('Converting file to nii.gz')
+    img = nib.load(fname_file_tmp)
+    fname_file_tmp = fname_file_tmp.split('.nii')[0] + '.nii.gz'
+    nib.save(img, fname_file_tmp)
 
     # Reorient the image to LPI orientation
     image_temp = Image(fname_file_tmp)
@@ -161,7 +153,7 @@ def main():
 
     # copy the prediction file to the output directory
     pred_file = glob.glob(os.path.join(tmpdir_nnunet, '*.nii.gz'))[0]
-    out_file = os.path.join(args.path_out, str(args.path_image.split('/')[-1].split('.')[0]) + '_pred.nii.gz')
+    out_file = os.path.join(args.path_out, str(args.path_image.split('/')[-1].split('.nii')[0]) + '_pred.nii.gz')
     shutil.copyfile(pred_file, out_file)
     #shutil.copyfile(pred_file, os.path.join(args.path_out, "model_ouput.nii.gz"))
 
@@ -171,14 +163,6 @@ def main():
         image_temp.change_orientation(orig_orientation)
         image_temp.save(out_file)
         #image_temp.save(os.path.join(args.path_out, "model_ouput_rotated.nii.gz"))
-
-    # # change resolution back to original
-    # if 1/ratio > 5 :
-    #     img_reupdated_zooms = nib.load(out_file)
-    #     img_reupdated_zooms.header.set_zooms(orig_resolution)
-    #     img_reupdated_zooms.set_sform(img_reupdated_zooms.get_qform())
-    #     nib.save(img_reupdated_zooms, out_file)
-    #     #nib.save(img_reupdated_zooms, os.path.join(args.path_out, "model_ouput_rotated_resized.nii.gz"))
 
     print('Deleting the temporary folder...')
     # Delete the temporary folder
