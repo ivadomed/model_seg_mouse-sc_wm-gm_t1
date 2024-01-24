@@ -11,6 +11,7 @@ Arguments:
     --path-model : Path to the model directory. This folder should contain individual folders like fold_0, fold_1, etc.'
     --use-gpu : Use GPU for inference. Default: False
     --use-mirroring : Use mirroring (test-time) augmentation for prediction. NOTE: Inference takes a long time when this is enabled. Default: False
+    --step-size : Step size for sliding window. Default: 0.5. A higher value makes inference faster. If inference fails, try increasing this value.
     
 Todo:
     * 
@@ -56,7 +57,8 @@ def get_parser():
     parser.add_argument('--use-mirroring', action='store_true', default=False,
                         help='Use mirroring (test-time) augmentation for prediction. '
                         'NOTE: Inference takes a long time when this is enabled. Default: False')
-
+    parser.add_argument('--step-size', default=0.5, type=float,
+                        help='Step size for sliding window. Default: 0.5. A higher value makes inference faster. If inference fails, try increasing this value.')
     return parser
 
 
@@ -81,19 +83,18 @@ def main():
     shutil.copyfile(fname_file, fname_file_tmp)
     print(f'Copied file to {fname_file_tmp}')
 
-    # change resolution if needed
-    img_updated_zooms = nib.load(fname_file_tmp)
-    orig_resolution = list(img_updated_zooms.header.get_zooms())
-    ratio = 0.05 / min(orig_resolution)
-    if 1/ratio > 5 :
-        dimensions = [orig_resolution[0] / 20, orig_resolution[1] /20, orig_resolution[2] /20]
-        # Update the image header
-        img_updated_zooms.header.set_zooms(dimensions)
-        img_updated_zooms.set_sform(img_updated_zooms.get_qform())
-        print("Resampling image to fit memory availability")
-        nib.save(img_updated_zooms, fname_file_tmp)
-        #nib.save(img_updated_zooms, os.path.join(args.path_out, "image_resized.nii.gz"))
-    
+    # # change resolution if needed
+    # img_updated_zooms = nib.load(fname_file_tmp)
+    # orig_resolution = list(img_updated_zooms.header.get_zooms())
+    # ratio = 0.05 / min(orig_resolution)
+    # if 1/ratio > 5 :
+    #     dimensions = [orig_resolution[0] / 20, orig_resolution[1] /20, orig_resolution[2] /20]
+    #     # Update the image header
+    #     img_updated_zooms.header.set_zooms(dimensions)
+    #     img_updated_zooms.set_sform(img_updated_zooms.get_qform())
+    #     print("Resampling image to fit memory availability")
+    #     nib.save(img_updated_zooms, fname_file_tmp)
+    #     #nib.save(img_updated_zooms, os.path.join(args.path_out, "image_resized.nii.gz"))
 
     # Reorient the image to LPI orientation
     image_temp = Image(fname_file_tmp)
@@ -121,9 +122,9 @@ def main():
 
     # instantiate the nnUNetPredictor
     predictor = nnUNetPredictor(
-        tile_step_size=0.9,     # changing it from 0.5 to 0.9 makes inference faster
+        tile_step_size=args.step_size,     # changing it from 0.5 to 0.9 makes inference faster
         use_gaussian=True,                      # applies gaussian noise and gaussian blur
-        use_mirroring=False,                    # test time augmentation by mirroring on all axes
+        use_mirroring=args.use_mirroring,                    # test time augmentation by mirroring on all axes
         perform_everything_on_gpu=True if args.use_gpu else False,
         device=torch.device('cuda') if args.use_gpu else torch.device('cpu'),
         verbose=False,
@@ -171,13 +172,13 @@ def main():
         image_temp.save(out_file)
         #image_temp.save(os.path.join(args.path_out, "model_ouput_rotated.nii.gz"))
 
-    # change resolution back to original
-    if 1/ratio > 5 :
-        img_reupdated_zooms = nib.load(out_file)
-        img_reupdated_zooms.header.set_zooms(orig_resolution)
-        img_reupdated_zooms.set_sform(img_reupdated_zooms.get_qform())
-        nib.save(img_reupdated_zooms, out_file)
-        #nib.save(img_reupdated_zooms, os.path.join(args.path_out, "model_ouput_rotated_resized.nii.gz"))
+    # # change resolution back to original
+    # if 1/ratio > 5 :
+    #     img_reupdated_zooms = nib.load(out_file)
+    #     img_reupdated_zooms.header.set_zooms(orig_resolution)
+    #     img_reupdated_zooms.set_sform(img_reupdated_zooms.get_qform())
+    #     nib.save(img_reupdated_zooms, out_file)
+    #     #nib.save(img_reupdated_zooms, os.path.join(args.path_out, "model_ouput_rotated_resized.nii.gz"))
 
     print('Deleting the temporary folder...')
     # Delete the temporary folder
