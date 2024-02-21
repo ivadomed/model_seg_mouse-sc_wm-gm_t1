@@ -29,11 +29,11 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 </details>
 
-For information on how to retrain the same model, refer to this file [README_training_model.md](./utils/README.md). 
+For information on how to retrain the same model, refer to this file [README.md](./utils/README.md). 
 
 ## How to use the model
 
-This is the recommended method to use the model (for other methode refer to [README_training_model.md](./utils/README.md)).
+This is the recommended method to use the model (for other methode refer to [README.md](./utils/README.md)).
 
 ### Install dependencies
 
@@ -47,7 +47,7 @@ Once the dependencies are installed, download the latest model:
 sct_deepseg -install-task seg_mouse_gm_wm_t1w
 ```
 
-### Getting the rootlet segmentation
+### Getting the WM and GM segmentation
 
 To segment a single image, run the following command: 
 
