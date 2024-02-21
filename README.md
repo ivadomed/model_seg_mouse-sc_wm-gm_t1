@@ -13,7 +13,7 @@ Publication linked to this model: see [CITATION.cff](./CITATION.cff)
 
 ## Project description
 
-In this project, we trained a 3D nnU-Net for spinal cord white and grey matter segmentation. The data contains 22 mice with different number of chunks, for a total of 72 MRI 3D images. Each MRI image is T2-weighted, has a size of 200x200x500, with the following resolution: 0.05x0.05x0.05 mm. 
+In this project, we trained a 3D nnU-Net for spinal cord white and grey matter segmentation. The data contains 22 mice with different number of chunks, for a total of 72 MRI 3D images. Each MRI image is T1-weighted, has a size of 200x200x500, with the following resolution: 0.05x0.05x0.05 mm. 
 
 <details>
   <summary>Expand this for more information on how we trained the model</summary>
@@ -29,63 +29,37 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 </details>
 
-For information on how to retrain the same model, refer to this file [README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md). 
+For information on how to retrain the same model, refer to this file [README_training_model.md](./utils/README.md). 
 
-If you wish to try the model on your own data, follow the instructions at [Installation](#installation) and [Perform predictions](#perform-predictions).
+## How to use the model
 
-## Installation
+This is the recommended method to use the model (for other methode refer to [README_training_model.md](./utils/README.md)).
 
-This section explains how to install and use the model on new images. 
+### Install dependencies
 
-Clone the repository:
-~~~
-git clone https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1.git
-cd model_seg_mouse-sc_wm-gm_t1
-~~~
+- [Spinal Cord Toolbox (SCT) v6.2](https://github.com/spinalcordtoolbox/spinalcordtoolbox/releases/tag/6.2) or higher -- follow the installation instructions [here](https://github.com/spinalcordtoolbox/spinalcordtoolbox?tab=readme-ov-file#installation)
+- [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) 
+- Python
 
-We recommend to use a virtual environment with python 3.9 to use nnUNet: 
-~~~
-conda create -n venv_nnunet python=3.9
-~~~
+Once the dependencies are installed, download the latest model:
 
-We activate the environment:
-~~~
-conda activate venv_nnunet
-~~~
+```bash
+sct_deepseg -install-task seg_mouse_gm_wm_t1w
+```
 
-Then install the required libraries:
-~~~
-pip install -r requirements.txt
-~~~
+### Getting the rootlet segmentation
 
-## Perform predictions
+To segment a single image, run the following command: 
 
-To run an inference and obtain a segmentation, we advise using the following method (refer to [utils/README_training_model.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/utils/README_training_model.md) for alternatives). 
+```bash
+sct_deepseg -i <INPUT> -o <OUTPUT> -task seg_mouse_gm_wm_t1w
+```
 
-Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
+For example:
 
-To perform predictions on a Nifti image (".nii.gz" or ".nii")
-~~~
-python test.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
-
-> [!NOTE]  
-> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder. <br>
-> To use GPU, add the flag `--use-gpu` in the previous command.<br>
-> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.<br>
-> To speed up inference, add flag `--step-size XX` with X being a value above 0.5 and below 1 (0.9 is advised).<br>
-> If inference fails : refer to the following [issue 44](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/44) for image pre-processing. 
-
-## Apply post-processing
-
-nnU-Net v2 comes with the possiblity of performing post-processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
-
-~~~
-CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
-~~~
-> [!NOTE]  
-> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.<br>
-> The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json`. 
+```bash
+sct_deepseg -i sub-001_T2w.nii.gz -o sub-001_T2w_wm-gm-seg.nii.gz -task seg_mouse_gm_wm_t1w
+```
 
 ## Notes
 
