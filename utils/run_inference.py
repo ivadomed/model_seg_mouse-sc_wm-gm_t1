@@ -3,7 +3,7 @@
 This python script runs inference of the 3D nnU-Net model on individual nifti images.  
 
 Example of run:
-        $ python test.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/model 
+        $ python run_inference.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/model 
 
 Arguments:
     --path-image : Path to the individual image to segment.
