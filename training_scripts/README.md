@@ -1,6 +1,36 @@
 # Training of a nnUNet model for SC WM and GM segmentation
 
-First, you need to perform the installation instructions from the [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/README.md).
+Here, we detail all the steps necessary to train and use an nnUNet model for the segmentation of mouse SC WM an GM. 
+The steps detail how to :
+- set-up the environment
+- preprocess the data
+- train the model
+- performing inference
+
+## Installation
+
+This section explains how to install and use the model on new images. 
+
+Clone the repository:
+~~~
+git clone https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1.git
+cd model_seg_mouse-sc_wm-gm_t1
+~~~
+
+We recommend to use a virtual environment with python 3.9 to use nnUNet: 
+~~~
+conda create -n venv_nnunet python=3.9
+~~~
+
+We activate the environment:
+~~~
+conda activate venv_nnunet
+~~~
+
+Then install the required libraries:
+~~~
+pip install -r utils/requirements.txt
+~~~
 
 ## Data
 
@@ -55,7 +85,7 @@ python ./utils/convert_nnunet_to_bids.py --path-conversion-dict /PATH/TO/DICT --
 
 This will output a dataset add a segmentation `mask_name` in the dataset derivatives.
 
-## Data preprocessing
+### nnUNet data preprocessing
 
 Before training the model, nnU-Net performs data preprocessing and checks the integrity of the dataset:
 
@@ -86,17 +116,19 @@ You can track the progress of the model with:
 nnUNet_results/DatasetDATASET-ID_TASK-NAME/nnUNetTrainer__nnUNetPlans__CONFIG/fold_FOLD/progress.png
 ~~~
 
-## Run inference
+## Running inference
 
-Here are the alernatives method from the one given in [README.md](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/blob/main/README.md) to perform inference. 
-
-To run an inference and obtain a segmentation, there are multiple ways to do so. 
+To run inference using our trained model, we recommend using the instructions in [README.md](../README.md). However, if you want to perform inference on your own model, there are multiple ways to do so. 
 
 ### Method 1 - Using your previous training
 
 Format the image data to the nnU-Net file structure. 
 Use a terminal command line:
 ~~~
+export nnUNet_raw="/path/to/nnUNet_raw"
+export nnUNet_preprocessed="/path/to/nnUNet_preprocessed"
+export nnUNet_results="/path/to/nnUNet_results"
+
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/predictions -d DATASET_ID -c CONFIG --save_probabilities -chk checkpoint_best.pth -f FOLD
 ~~~
 
@@ -112,3 +144,14 @@ CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/p
 ~~~
 
 You can now access the predictions in the folder `/path/to/predictions`. 
+
+## Apply post-processing
+
+nnU-Net v2 comes with the possiblity of performing post-processing on the segmentation images. This was not included in the run inference script as it doesn't bring notable change to the result. To run post-processing run the following script.
+
+~~~
+CUDA_VISIBLE_DEVICES=XX nnUNetv2_apply_postprocessing -i /seg/folder -o /output/folder -pp_pkl_file /path/to/postprocessing.pkl -np 8 -plans_json /path/to/post-processing/plans.json
+~~~
+> [!NOTE]  
+> The file `postprocessing.pkl` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl`.<br>
+> The file `plans.json` is stored in `Dataset500_zurich_mouse/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json`. 
