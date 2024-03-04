@@ -118,37 +118,23 @@ nnUNet_results/DatasetDATASET-ID_TASK-NAME/nnUNetTrainer__nnUNetPlans__CONFIG/fo
 
 ## Running inference
 
-To run inference using our trained model, we recommand using the instructions in [README.md](../README.md). However, if you want to perform inference on your own model, there are multiple ways to do so. 
+To run inference using our trained model, we recommend using the instructions in [README.md](../README.md). However, if you want to perform inference on your own model, there are multiple ways to do so. 
 
-### Method 1 - Using a python script on a trained model
-
-This can be used to performance inference on our trained model or on your model. If you want to do it on your own model, skip the first step. 
-
-Download the [model.zip](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) from the release and unzip it. 
-
-To perform predictions on a Nifti image (".nii.gz" or ".nii")
-~~~
-python utils/run_inference.py --path-image /path/to/image --path-out /path/to/output --path-model /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
-~~~
-
-> [!NOTE]  
-> The `nnUNetTrainer__nnUNetPlans__3d_fullres` folder is inside the `Dataset500_zurich_mouse` folder. <br>
-> To use GPU, add the flag `--use-gpu` in the previous command.<br>
-> To use mirroring (test-time) augmentation, add flag `--use-mirroring`. NOTE: Inference takes a long time when this is enabled. Default: False.<br>
-> To speed up inference, add flag `--step-size XX` with X being a value above 0.5 and below 1 (0.9 is advised).<br>
-> If inference fails : refer to the following [issue 44](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/issues/44) for image pre-processing. 
-
-### Method 2 - Using your previous training
+### Method 1 - Using your previous training
 
 Format the image data to the nnU-Net file structure. 
 Use a terminal command line:
 ~~~
+export nnUNet_raw="/path/to/nnUNet_raw"
+export nnUNet_preprocessed="/path/to/nnUNet_preprocessed"
+export nnUNet_results="/path/to/nnUNet_results"
+
 CUDA_VISIBLE_DEVICES=XXX nnUNetv2_predict -i /path/to/image/folder -o /path/to/predictions -d DATASET_ID -c CONFIG --save_probabilities -chk checkpoint_best.pth -f FOLD
 ~~~
 
 You can now access the predictions in the folder `/path/to/predictions`. 
 
-### Method 3 - Using our trained model on terminal 
+### Method 2 - Using our trained model on terminal 
 
 Format the image data to the nnU-Net file structure. 
 Download the `model.zip` from the [release](https://github.com/ivadomed/model_seg_mouse-sc_wm-gm_t1/releases/tag/v0.3) and unzip it in the `/nnUNet_results` folder (it also requires to export the 3 variables as done previously). 
