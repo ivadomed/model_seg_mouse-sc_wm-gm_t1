@@ -33,7 +33,7 @@ For information on how to retrain the same model, refer to this file [README.md]
 
 ## How to use the model
 
-This is the recommended method to use the model (for other methode refer to [README.md](./utils/README.md)).
+This is the recommended method to use our model.
 
 ### Install dependencies
 
