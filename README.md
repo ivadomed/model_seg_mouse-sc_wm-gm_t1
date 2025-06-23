@@ -29,7 +29,7 @@ For the packaging we decided to keep only fold 4 as it has the best dice score a
 
 </details>
 
-For information on how to retrain the same model, refer to this file [README.md](./utils/README.md). 
+For information on how to retrain the same model, refer to this file [README.md](./training_scripts/README.md). 
 
 ## How to use the model
 
